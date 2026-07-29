@@ -101,7 +101,9 @@ const api = (
   versionBucket,
   source,
   sourceNames,
-  webAliases: sourceNames.filter((name) => legacyCoreWebAliasSet.has(name)),
+  historicalV1WebAliases: sourceNames.filter((name) =>
+    legacyCoreWebAliasSet.has(name),
+  ),
   note,
 })
 
@@ -122,7 +124,11 @@ export const webOwnedExports = [
   { name: 'NodeLineageResult', kind: 'type', source: 'src/flow/node-lineage.ts' },
   { name: 'NodeLineageSource', kind: 'type', source: 'src/flow/node-lineage.ts' },
   { name: 'TraceNodesOptions', kind: 'type', source: 'src/flow/node-lineage.ts' },
-  { name: 'CodeDocInvariantError', kind: 'class', source: 'src/flow/code-convert.ts' },
+  {
+    name: 'FieldWeftDocInvariantError',
+    kind: 'class',
+    source: 'src/flow/code-convert.ts',
+  },
   { name: 'docToGraph', kind: 'function', source: 'src/flow/code-convert.ts' },
   { name: 'graphToDoc', kind: 'function', source: 'src/flow/code-convert.ts' },
   { name: 'FIELD_TYPES', kind: 'value', source: 'src/flow/code.ts' },
@@ -134,7 +140,7 @@ export const webOwnedExports = [
 
 export const publicApiReview = {
   status: 'approved',
-  approvedAt: '2026-07-26',
+  approvedAt: '2026-07-29',
   reviewItems: [],
 }
 

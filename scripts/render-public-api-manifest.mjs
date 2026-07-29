@@ -40,7 +40,8 @@ function render() {
     '> **Language:** This English manifest is normative. Korean documentation is',
     '> non-normative commentary; English takes precedence if the two differ.',
     '> Names in the “Current source names” column classify the extraction source.',
-    '> Only names in “fieldweft-web facade names” remain compatibility exports.',
+    '> Names in the “Historical v1 fieldweft-web aliases” column are superseded',
+    '> extraction history and MUST NOT be exported as compatibility aliases.',
     '',
     '## Decisions represented by this manifest',
     '',
@@ -56,8 +57,10 @@ function render() {
     '- Canonicalization, serialization, projection, and diff operations remain',
     '  unversioned because their parameter and result types pin them to v1.',
     '- The d1 share codec uses its own share and pack-version axis.',
-    '- Legacy `CodeDoc`, `CODE_DOC`, and unbranded names are migration inputs only.',
-    '  Compatibility aliases belong in `fieldweft-web`, not this package.',
+    '- Legacy `CodeDoc`, `CODE_DOC`, and unbranded names are extraction history only,',
+    '  not migration inputs or compatibility contracts.',
+    '- The first `fieldweft-web` release consumes `Public name` directly and MUST NOT',
+    '  export aliases from the historical v1 column.',
     '- The schema and named golden fixtures are package subpath contracts.',
     '- Reference adapter source is a packaged copy-only documentation asset, not',
     '  a root export or package subpath.',
@@ -102,24 +105,29 @@ function render() {
   for (const source of sources) {
     lines.push(`### ${code(source)}`, '')
     lines.push(
-      '| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |',
+      '| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |',
     )
     lines.push('|---|---|---|---|---|---|')
     for (const entry of publicApiManifest.filter((item) => item.source === source)) {
       const sourceNames = entry.sourceNames.length
         ? entry.sourceNames.map(code).join(', ')
         : '—'
-      const webAliases = entry.webAliases.length
-        ? entry.webAliases.map(code).join(', ')
+      const historicalV1WebAliases = entry.historicalV1WebAliases.length
+        ? entry.historicalV1WebAliases.map(code).join(', ')
         : '—'
       lines.push(
-        `| ${code(entry.publicName)} | ${entry.kind} | ${code(entry.versionBucket)} | ${sourceNames} | ${webAliases} | ${entry.note || '—'} |`,
+        `| ${code(entry.publicName)} | ${entry.kind} | ${code(entry.versionBucket)} | ${sourceNames} | ${historicalV1WebAliases} | ${entry.note || '—'} |`,
       )
     }
     lines.push('')
   }
 
-  lines.push('## fieldweft-web-owned facade exports', '')
+  lines.push('## fieldweft-web-owned v2 implementation names', '')
+  lines.push(
+    'This is an ownership-boundary inventory, not a compatibility-export or public-facade mandate.',
+    'The first `fieldweft-web` release MUST NOT retain superseded v1 aliases for these names.',
+    '',
+  )
   lines.push('| Name | Kind | Source in fieldweft-web |')
   lines.push('|---|---|---|')
   for (const entry of webOwnedExports) {

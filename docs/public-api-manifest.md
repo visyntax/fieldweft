@@ -1,10 +1,11 @@
 # Public API Manifest
 
-> **Status:** Approved on 2026-07-26.
+> **Status:** Approved on 2026-07-29.
 > **Language:** This English manifest is normative. Korean documentation is
 > non-normative commentary; English takes precedence if the two differ.
 > Names in the “Current source names” column classify the extraction source.
-> Only names in “fieldweft-web facade names” remain compatibility exports.
+> Names in the “Historical v1 fieldweft-web aliases” column are superseded
+> extraction history and MUST NOT be exported as compatibility aliases.
 
 ## Decisions represented by this manifest
 
@@ -20,8 +21,10 @@
 - Canonicalization, serialization, projection, and diff operations remain
   unversioned because their parameter and result types pin them to v1.
 - The d1 share codec uses its own share and pack-version axis.
-- Legacy `CodeDoc`, `CODE_DOC`, and unbranded names are migration inputs only.
-  Compatibility aliases belong in `fieldweft-web`, not this package.
+- Legacy `CodeDoc`, `CODE_DOC`, and unbranded names are extraction history only,
+  not migration inputs or compatibility contracts.
+- The first `fieldweft-web` release consumes `Public name` directly and MUST NOT
+  export aliases from the historical v1 column.
 - The schema and named golden fixtures are package subpath contracts.
 - Reference adapter source is a packaged copy-only documentation asset, not
   a root export or package subpath.
@@ -62,7 +65,7 @@
 
 ### `src/fieldweft-v1.generated.ts`
 
-| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |
+| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |
 |---|---|---|---|---|---|
 | `FIELD_WEFT_FORMAT` | value | `global` | `FIELD_WEFT_FORMAT`, `CODE_DOC_FORMAT` | `CODE_DOC_FORMAT` | — |
 | `FIELD_WEFT_VERSION_V1` | value | `v1` | `FIELD_WEFT_VERSION`, `CODE_DOC_VERSION` | `CODE_DOC_VERSION` | — |
@@ -111,7 +114,7 @@
 
 ### `src/code-model.ts`
 
-| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |
+| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |
 |---|---|---|---|---|---|
 | `FIELD_WEFT_MAX_NODES_V1` | value | `v1` | `MAX_CODEDOC_NODES` | `MAX_CODEDOC_NODES` | — |
 | `FIELD_WEFT_MAX_RELATIONS_V1` | value | `v1` | `MAX_CODEDOC_RELATIONS` | `MAX_CODEDOC_RELATIONS` | — |
@@ -140,7 +143,7 @@
 
 ### `src/code-canonical.ts`
 
-| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |
+| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |
 |---|---|---|---|---|---|
 | `canonicalizeFieldWeftDoc` | function | `v1-typed` | `canonicalizeCodeDoc` | `canonicalizeCodeDoc` | — |
 | `projectSemanticFieldWeftDoc` | function | `v1-typed` | `projectSemanticCodeDoc` | `projectSemanticCodeDoc` | — |
@@ -148,7 +151,7 @@
 
 ### `src/code-diff.ts`
 
-| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |
+| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |
 |---|---|---|---|---|---|
 | `FieldWeftSemanticObjectKindV1` | type | `v1` | `SemanticObjectKind` | `SemanticObjectKind` | — |
 | `FieldWeftFieldOwnerKindV1` | type | `v1` | `FieldOwnerKind` | `FieldOwnerKind` | — |
@@ -159,7 +162,7 @@
 
 ### `src/code-input.ts`
 
-| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |
+| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |
 |---|---|---|---|---|---|
 | `ReadCanonicalFieldWeftDocResult` | type | `dispatcher` | `ReadCanonicalCodeDocResult` | `ReadCanonicalCodeDocResult` | — |
 | `readCanonicalFieldWeftDoc` | function | `dispatcher` | `readCanonicalCodeDoc` | `readCanonicalCodeDoc` | — |
@@ -168,7 +171,7 @@
 
 ### `src/code-serialize.ts`
 
-| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |
+| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |
 |---|---|---|---|---|---|
 | `SerializeCanonicalFieldWeftDocOptions` | type | `version-neutral` | `SerializeCanonicalCodeDocOptions` | `SerializeCanonicalCodeDocOptions` | — |
 | `serializeCanonicalFieldWeftDoc` | function | `v1-typed` | `serializeCanonicalCodeDoc` | `serializeCanonicalCodeDoc` | — |
@@ -176,7 +179,7 @@
 
 ### `src/code-validate.ts`
 
-| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |
+| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |
 |---|---|---|---|---|---|
 | `FieldWeftDiagnosticRelated` | type | `global` | `DiagnosticRelated` | `DiagnosticRelated` | — |
 | `FieldWeftDiagnostic` | type | `global` | `Diagnostic` | `Diagnostic` | — |
@@ -187,7 +190,7 @@
 
 ### `src/field-id.ts`
 
-| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |
+| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |
 |---|---|---|---|---|---|
 | `FIELD_ID_SUFFIX_ALPHABET` | value | `global` | `FIELD_ID_SUFFIX_ALPHABET` | `FIELD_ID_SUFFIX_ALPHABET` | — |
 | `FIELD_ID_SUFFIX_LENGTH` | value | `global` | `FIELD_ID_SUFFIX_LENGTH` | `FIELD_ID_SUFFIX_LENGTH` | — |
@@ -200,7 +203,7 @@
 
 ### `src/share-codec.ts`
 
-| Public name | Kind | Bucket | Current source names | fieldweft-web facade names | Note |
+| Public name | Kind | Bucket | Current source names | Historical v1 fieldweft-web aliases (superseded) | Note |
 |---|---|---|---|---|---|
 | `FIELD_WEFT_SHARE_PACK_VERSION` | value | `share` | `SHARE_PACK_VERSION` | — | — |
 | `FIELD_WEFT_SHARE_FORMAT` | value | `share` | `SHARE_FORMAT` | — | — |
@@ -214,7 +217,10 @@
 | `encodeFieldWeftShare` | function | `share` | `encodeShare` | — | — |
 | `decodeFieldWeftShare` | function | `share` | `decodeShare` | — | — |
 
-## fieldweft-web-owned facade exports
+## fieldweft-web-owned v2 implementation names
+
+This is an ownership-boundary inventory, not a compatibility-export or public-facade mandate.
+The first `fieldweft-web` release MUST NOT retain superseded v1 aliases for these names.
 
 | Name | Kind | Source in fieldweft-web |
 |---|---|---|
@@ -230,7 +236,7 @@
 | `NodeLineageResult` | type | `src/flow/node-lineage.ts` |
 | `NodeLineageSource` | type | `src/flow/node-lineage.ts` |
 | `TraceNodesOptions` | type | `src/flow/node-lineage.ts` |
-| `CodeDocInvariantError` | class | `src/flow/code-convert.ts` |
+| `FieldWeftDocInvariantError` | class | `src/flow/code-convert.ts` |
 | `docToGraph` | function | `src/flow/code-convert.ts` |
 | `graphToDoc` | function | `src/flow/code-convert.ts` |
 | `FIELD_TYPES` | value | `src/flow/code.ts` |

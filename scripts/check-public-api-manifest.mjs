@@ -134,7 +134,7 @@ function relativeFiles(directory, prefix = '') {
 const errors = []
 const publicNames = new Set()
 const extractionSourceNames = new Map()
-const coveredWebAliases = new Map()
+const coveredHistoricalV1WebAliases = new Map()
 
 if (new Set(legacyCoreWebAliases).size !== legacyCoreWebAliases.length) {
   errors.push('legacyCoreWebAliases contains duplicate names.')
@@ -205,29 +205,35 @@ for (const entry of publicApiManifest) {
     }
     extractionSourceNames.set(sourceName, entry.publicName)
   }
-  if (!Array.isArray(entry.webAliases)) {
-    errors.push(`Web aliases must be an array for ${entry.publicName}`)
+  if (!Array.isArray(entry.historicalV1WebAliases)) {
+    errors.push(
+      `Historical v1 web aliases must be an array for ${entry.publicName}`,
+    )
     continue
   }
-  for (const alias of entry.webAliases) {
+  for (const alias of entry.historicalV1WebAliases) {
     if (!entry.sourceNames.includes(alias)) {
-      errors.push(`Web alias ${alias} is not a source name for ${entry.publicName}`)
+      errors.push(
+        `Historical v1 web alias ${alias} is not a source name for ${entry.publicName}`,
+      )
     }
-    const previous = coveredWebAliases.get(alias)
+    const previous = coveredHistoricalV1WebAliases.get(alias)
     if (previous) {
-      errors.push(`Web alias ${alias} is mapped by both ${previous} and ${entry.publicName}`)
+      errors.push(
+        `Historical v1 web alias ${alias} is mapped by both ${previous} and ${entry.publicName}`,
+      )
     }
-    coveredWebAliases.set(alias, entry.publicName)
+    coveredHistoricalV1WebAliases.set(alias, entry.publicName)
   }
 }
 
 for (const alias of legacyCoreWebAliases) {
-  if (!coveredWebAliases.has(alias)) {
-    errors.push(`Legacy core web alias is not mapped: ${alias}`)
+  if (!coveredHistoricalV1WebAliases.has(alias)) {
+    errors.push(`Historical v1 core web alias is not mapped: ${alias}`)
   }
 }
 
-const webFacadeNames = new Map(coveredWebAliases)
+const webOwnedNames = new Set()
 for (const entry of webOwnedExports) {
   if (!allowedKinds.has(entry.kind)) {
     errors.push(`Unknown fieldweft-web export kind for ${entry.name}: ${entry.kind}`)
@@ -235,11 +241,10 @@ for (const entry of webOwnedExports) {
   if (!entry.name || !entry.source) {
     errors.push('Each fieldweft-web-owned export must have a name and source.')
   }
-  const previous = webFacadeNames.get(entry.name)
-  if (previous) {
-    errors.push(`Web facade name ${entry.name} is owned by both ${previous} and fieldweft-web`)
+  if (webOwnedNames.has(entry.name)) {
+    errors.push(`Duplicate fieldweft-web-owned v2 name: ${entry.name}`)
   }
-  webFacadeNames.set(entry.name, 'fieldweft-web')
+  webOwnedNames.add(entry.name)
 }
 
 for (const entry of excludedApiSymbols) {
@@ -403,5 +408,5 @@ if (errors.length) {
 }
 
 console.log(
-  `Public API manifest (${publicApiReview.status}) matches ${actualModuleExports.size} classified module exports, ${rootExportNames.size} root exports, ${publicPackageExports.length} package subpaths, ${coveredWebAliases.size} core web aliases, ${webOwnedExports.length} web-owned exports, and ${excludedApiSymbols.length} exclusions.`,
+  `Public API manifest (${publicApiReview.status}) matches ${actualModuleExports.size} classified module exports, ${rootExportNames.size} root exports, ${publicPackageExports.length} package subpaths, ${coveredHistoricalV1WebAliases.size} historical v1 core web aliases, ${webOwnedExports.length} web-owned v2 names, and ${excludedApiSymbols.length} exclusions.`,
 )
