@@ -1,0 +1,104 @@
+{
+  "document": {
+    "format": "fieldweft",
+    "version": 1,
+    "entities": [
+      {
+        "id": "source",
+        "name": "Source",
+        "kind": "db",
+        "description": "Source dataset",
+        "tags": ["critical"],
+        "meta": {
+          "10": "ten",
+          "2": "two",
+          "owner": null
+        },
+        "position": { "x": 0, "y": 0 },
+        "fields": []
+      },
+      {
+        "id": "target",
+        "name": "Target",
+        "kind": "db",
+        "position": { "x": 0, "y": 120 },
+        "fields": []
+      }
+    ],
+    "processes": [
+      {
+        "id": "job",
+        "name": "Job",
+        "kind": "other",
+        "tags": ["batch"],
+        "meta": { "enabled": true },
+        "position": { "x": 340, "y": 120 },
+        "inputs": [],
+        "outputs": []
+      }
+    ],
+    "boundaries": [],
+    "nodeRelations": [
+      {
+        "id": "source_to_job",
+        "sourceNodeId": "source",
+        "targetNodeId": "job",
+        "label": "extract",
+        "description": "Extract source",
+        "meta": { "reviewed": false }
+      },
+      {
+        "id": "job_to_target",
+        "sourceNodeId": "job",
+        "targetNodeId": "target"
+      }
+    ],
+    "mappings": []
+  },
+  "packed": [
+    1,
+    0,
+    0,
+    [
+      [
+        "source",
+        "Source",
+        2,
+        0,
+        0,
+        [],
+        0,
+        [
+          "Source dataset",
+          ["critical"],
+          [["10", "ten"], ["2", "two"], ["owner", null]]
+        ]
+      ],
+      ["target", "Target", 2, 0, 120, []]
+    ],
+    [
+      [
+        "job",
+        "Job",
+        3,
+        340,
+        120,
+        [],
+        [],
+        [0, ["batch"], [["enabled", true]]]
+      ]
+    ],
+    [],
+    [],
+    [
+      [
+        "source_to_job",
+        0,
+        2,
+        "extract",
+        ["Extract source", 0, [["reviewed", false]]]
+      ],
+      ["job_to_target", 2, 1]
+    ]
+  ]
+}

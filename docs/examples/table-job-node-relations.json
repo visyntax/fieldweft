@@ -1,0 +1,37 @@
+{
+  "format": "fieldweft",
+  "version": 1,
+  "entities": [
+    {
+      "id": "raw_orders",
+      "name": "raw.orders",
+      "kind": "db",
+      "fields": [
+        { "id": "raw_order_id", "name": "order_id", "type": "string", "pk": true }
+      ]
+    },
+    {
+      "id": "daily_orders",
+      "name": "analytics.daily_orders",
+      "kind": "db",
+      "fields": [
+        { "id": "daily_order_id", "name": "order_id", "type": "string", "pk": true }
+      ]
+    }
+  ],
+  "processes": [
+    {
+      "id": "daily_orders_job",
+      "name": "daily_orders_job",
+      "kind": "other",
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "boundaries": [],
+  "nodeRelations": [
+    { "id": "raw_to_job", "sourceNodeId": "raw_orders", "targetNodeId": "daily_orders_job", "label": "reads" },
+    { "id": "job_to_daily", "sourceNodeId": "daily_orders_job", "targetNodeId": "daily_orders", "label": "writes" }
+  ],
+  "mappings": []
+}

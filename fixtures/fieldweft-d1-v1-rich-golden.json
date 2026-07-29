@@ -1,0 +1,242 @@
+{
+  "document": {
+    "format": "fieldweft",
+    "version": 1,
+    "entities": [
+      {
+        "id": "source",
+        "name": "Source",
+        "kind": "event",
+        "description": "Boundary member source",
+        "tags": ["critical"],
+        "meta": { "owner": "orders" },
+        "position": { "x": 40, "y": 80 },
+        "fields": [
+          {
+            "id": "status",
+            "name": "status",
+            "type": "string",
+            "discriminator": { "values": ["OPEN", "CLOSED"] }
+          },
+          {
+            "id": "details",
+            "name": "details",
+            "type": "object",
+            "children": [
+              {
+                "id": "amount",
+                "name": "amount",
+                "type": "number",
+                "when": { "status": ["OPEN"] }
+              }
+            ]
+          }
+        ],
+        "collapsed": ["details"]
+      },
+      {
+        "id": "target",
+        "name": "Target",
+        "kind": "db",
+        "position": { "x": -4500, "y": 3200 },
+        "fields": [
+          {
+            "id": "stored_amount",
+            "name": "storedAmount",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "processes": [
+      {
+        "id": "normalize",
+        "name": "Normalize",
+        "kind": "other",
+        "description": "Normalize amount",
+        "tags": ["batch"],
+        "meta": { "enabled": true },
+        "position": { "x": -2500, "y": 3600 },
+        "inputs": [
+          {
+            "id": "normalize_in",
+            "name": "input",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "normalize_out",
+            "name": "output",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "boundaries": [
+      {
+        "id": "external",
+        "name": "External",
+        "color": "purple",
+        "kind": "external",
+        "description": "External order domain",
+        "tags": ["restricted"],
+        "meta": { "security": "high" },
+        "position": { "x": -5000, "y": 2500 },
+        "size": { "width": 880, "height": 640 },
+        "members": ["source"]
+      }
+    ],
+    "nodeRelations": [
+      {
+        "id": "source_to_normalize",
+        "sourceNodeId": "source",
+        "targetNodeId": "normalize",
+        "label": "calls",
+        "description": "Normalize request",
+        "meta": { "sync": true }
+      }
+    ],
+    "mappings": [
+      {
+        "id": "map_in",
+        "sourceFieldId": "amount",
+        "targetFieldId": "normalize_in",
+        "kind": "keep",
+        "description": "Raw amount",
+        "tags": ["lineage"],
+        "meta": { "confidence": 1 }
+      },
+      {
+        "id": "map_out",
+        "sourceFieldId": "normalize_out",
+        "targetFieldId": "stored_amount",
+        "kind": "transform",
+        "label": "normalize currency",
+        "description": "Normalized amount",
+        "meta": { "confidence": 0.9 }
+      }
+    ]
+  },
+  "packed": [
+    1,
+    -5000,
+    2500,
+    [
+      [
+        "source",
+        "Source",
+        0,
+        40,
+        80,
+        [
+          ["status", "status", 1, 0, 0, ["OPEN", "CLOSED"]],
+          [
+            "details",
+            "details",
+            5,
+            0,
+            [
+              [
+                "amount",
+                "amount",
+                2,
+                0,
+                0,
+                0,
+                [[0, 0]]
+              ]
+            ]
+          ]
+        ],
+        [1],
+        [
+          "Boundary member source",
+          ["critical"],
+          [["owner", "orders"]]
+        ]
+      ],
+      [
+        "target",
+        "Target",
+        2,
+        500,
+        700,
+        [["stored_amount", "storedAmount", 2, 0]]
+      ]
+    ],
+    [
+      [
+        "normalize",
+        "Normalize",
+        3,
+        2500,
+        1100,
+        [["normalize_in", "input", 2, 0]],
+        [["normalize_out", "output", 2, 0]],
+        [
+          "Normalize amount",
+          ["batch"],
+          [["enabled", true]]
+        ]
+      ]
+    ],
+    [
+      [
+        "external",
+        "External",
+        0,
+        0,
+        880,
+        640,
+        [0],
+        3,
+        3,
+        [
+          "External order domain",
+          ["restricted"],
+          [["security", "high"]]
+        ]
+      ]
+    ],
+    [
+      [
+        "map_in",
+        2,
+        4,
+        0,
+        0,
+        [
+          "Raw amount",
+          ["lineage"],
+          [["confidence", 1]]
+        ]
+      ],
+      [
+        "map_out",
+        5,
+        3,
+        2,
+        "normalize currency",
+        [
+          "Normalized amount",
+          0,
+          [["confidence", 0.9]]
+        ]
+      ]
+    ],
+    [
+      [
+        "source_to_normalize",
+        0,
+        2,
+        "calls",
+        [
+          "Normalize request",
+          0,
+          [["sync", true]]
+        ]
+      ]
+    ]
+  ]
+}

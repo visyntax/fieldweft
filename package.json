@@ -1,0 +1,81 @@
+{
+  "name": "fieldweft",
+  "version": "1.0.0-rc.1",
+  "description": "Portable schema, validation, canonicalization, diffing, and share codecs for FieldWeft documents.",
+  "keywords": [
+    "fieldweft",
+    "schema",
+    "validation",
+    "canonicalization",
+    "data-lineage"
+  ],
+  "homepage": "https://github.com/visyntax/fieldweft#readme",
+  "bugs": {
+    "url": "https://github.com/visyntax/fieldweft/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/visyntax/fieldweft.git"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema/v1": "./schema/fieldweft-v1.schema.json",
+    "./fixtures/*": "./fixtures/*"
+  },
+  "files": [
+    "CONTRIBUTING.md",
+    "CONTRIBUTING.ko.md",
+    "LICENSE",
+    "README.md",
+    "README.ko.md",
+    "dist",
+    "docs",
+    "schema",
+    "fixtures",
+    "src/adapter-reference.ts"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "generate:fieldweft-types": "node scripts/generate-fieldweft-types.mjs",
+    "check:fieldweft-schema": "node scripts/generate-fieldweft-types.mjs --check",
+    "generate:public-api-manifest": "node scripts/render-public-api-manifest.mjs",
+    "validate:public-api-manifest": "node scripts/check-public-api-manifest.mjs && node scripts/render-public-api-manifest.mjs --check",
+    "check:public-api-manifest": "node scripts/check-public-api-manifest.mjs --require-approved && node scripts/render-public-api-manifest.mjs --check",
+    "check:dist-exports": "node scripts/check-dist-exports.mjs",
+    "check:bench-field-id": "node scripts/bench-field-id.mjs --smoke",
+    "verify": "npm run check:fieldweft-schema && npm run check:public-api-manifest && npm run check && npm run lint && npm run test:documentation-contract && npm run test:publish-policy && npm run test:core && npm run check:bench-field-id",
+    "verify:release": "npm run verify && npm run test:package-smoke",
+    "test": "npm run verify",
+    "test:code-doc": "npm run build --silent && node scripts/test-code-doc.mjs",
+    "test:documentation-contract": "node scripts/test-documentation-contract.mjs",
+    "test:input-boundaries": "npm run build --silent && node scripts/test-input-boundaries.mjs",
+    "test:package-smoke": "node scripts/test-package-smoke.mjs",
+    "test:publish-policy": "node scripts/test-publish-policy.mjs",
+    "test:share-codec": "npm run build --silent && node scripts/test-share-codec.mjs",
+    "test:core": "npm run build && npm run check:dist-exports && node scripts/test-code-doc.mjs && node scripts/test-input-boundaries.mjs && node scripts/test-share-codec.mjs",
+    "bench:field-id": "node scripts/bench-field-id.mjs",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "~10.0.1",
+    "eslint": "~10.7.0",
+    "globals": "~17.7.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "~8.65.0"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "format": "fieldweft",
+  "version": 1,
+  "entities": [
+    {
+      "id": "raw_orders",
+      "name": "raw.orders",
+      "kind": "db",
+      "description": "원본 주문 변경분을 담는 source table",
+      "tags": ["bronze", "critical"],
+      "meta": {
+        "owner": "data-platform",
+        "source.system": "warehouse"
+      },
+      "position": { "x": 40, "y": 80 },
+      "fields": [
+        {
+          "id": "raw_order_id",
+          "name": "order_id",
+          "type": "string",
+          "description": "source 주문 식별자",
+          "tags": ["identifier"],
+          "pk": true
+        }
+      ]
+    },
+    {
+      "id": "daily_orders",
+      "name": "analytics.daily_orders",
+      "kind": "db",
+      "position": { "x": 760, "y": 180 },
+      "fields": [
+        { "id": "daily_order_id", "name": "order_id", "type": "string", "pk": true }
+      ]
+    }
+  ],
+  "processes": [
+    {
+      "id": "daily_orders_job",
+      "name": "daily_orders_job",
+      "kind": "other",
+      "description": "원본 주문을 일별 분석 모델로 정규화한다.",
+      "tags": ["batch"],
+      "meta": { "owner": "analytics" },
+      "position": { "x": 360, "y": 80 },
+      "inputs": [
+        { "id": "job_order_id_in", "name": "order_id", "type": "string" }
+      ],
+      "outputs": [
+        { "id": "job_order_id_out", "name": "order_id", "type": "string" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "id": "data_platform",
+      "name": "Data Platform",
+      "color": "blue",
+      "kind": "system",
+      "description": "boundary position은 canvas 절대좌표이고 member position은 이 좌상단 기준 상대좌표다.",
+      "position": { "x": 800, "y": 120 },
+      "size": { "width": 680, "height": 360 },
+      "members": ["raw_orders", "daily_orders_job"]
+    }
+  ],
+  "nodeRelations": [
+    {
+      "id": "raw_to_job",
+      "sourceNodeId": "raw_orders",
+      "targetNodeId": "daily_orders_job",
+      "label": "reads",
+      "description": "매일 source snapshot을 읽는다.",
+      "tags": ["scheduled"]
+    },
+    { "id": "job_to_daily", "sourceNodeId": "daily_orders_job", "targetNodeId": "daily_orders", "label": "writes" }
+  ],
+  "mappings": [
+    {
+      "id": "map_raw_to_job",
+      "sourceFieldId": "raw_order_id",
+      "targetFieldId": "job_order_id_in",
+      "description": "식별자를 변환 없이 전달한다.",
+      "meta": { "reviewed": true }
+    },
+    { "id": "map_job_to_daily", "sourceFieldId": "job_order_id_out", "targetFieldId": "daily_order_id", "kind": "transform", "label": "normalize id" }
+  ]
+}

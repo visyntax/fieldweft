@@ -1,0 +1,52 @@
+{
+  "format": "fieldweft",
+  "version": 1,
+  "entities": [
+    {
+      "id": "entity",
+      "name": "Entity",
+      "kind": "db",
+      "description": "Canonical fixture",
+      "tags": ["z", "A"],
+      "meta": {
+        "2": "two",
+        "10": "ten",
+        "codeWithLeadingZero": "00123",
+        "exactDecimal": "1234567890.1234567890",
+        "longId": "9223372036854775807",
+        "threshold": 1e-6,
+        "": "bmp",
+        "😀": "supplementary"
+      },
+      "position": { "x": 0, "y": 0 },
+      "fields": [
+        {
+          "id": "2",
+          "name": "second",
+          "type": "string",
+          "discriminator": { "values": ["A"] }
+        },
+        {
+          "id": "10",
+          "name": "tenth",
+          "type": "string",
+          "discriminator": { "values": ["B"] }
+        },
+        {
+          "id": "value",
+          "name": "value",
+          "type": "string",
+          "description": "conditional",
+          "when": {
+            "2": ["A"],
+            "10": ["B"]
+          }
+        }
+      ]
+    }
+  ],
+  "processes": [],
+  "boundaries": [],
+  "nodeRelations": [],
+  "mappings": []
+}

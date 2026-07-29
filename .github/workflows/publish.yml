@@ -1,0 +1,56 @@
+name: Publish npm package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-fieldweft
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish verified package
+    if: github.repository == 'visyntax/fieldweft' && github.ref_type == 'tag'
+    environment: npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and npm registry
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate tag and release channel
+        id: release
+        shell: bash
+        run: >-
+          node scripts/check-publish-context.mjs
+          --tag "$GITHUB_REF_NAME"
+          --repository "$GITHUB_REPOSITORY"
+          --npm-version "$(npm --version)"
+
+      - name: Verify source and packed consumers
+        run: npm run verify:release
+
+      - name: Publish with provenance
+        run: npm publish --access public --provenance --tag "${{ steps.release.outputs.dist-tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

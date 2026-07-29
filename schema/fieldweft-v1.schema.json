@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "fieldweft-v1.schema.json",
+  "title": "FieldWeft v1",
+  "description": "The public FieldWeft v1 graph document contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "entities",
+    "processes",
+    "boundaries",
+    "nodeRelations",
+    "mappings"
+  ],
+  "properties": {
+    "format": { "const": "fieldweft" },
+    "version": { "const": 1 },
+    "entities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Entity" }
+    },
+    "processes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Process" }
+    },
+    "boundaries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Boundary" }
+    },
+    "nodeRelations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/NodeRelation" }
+    },
+    "mappings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Mapping" }
+    }
+  },
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "Name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "Label": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "Description": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "Tag": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "Tags": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/Tag" }
+    },
+    "MetadataValue": {
+      "type": ["string", "number", "boolean", "null"],
+      "maxLength": 4096
+    },
+    "Metadata": {
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": {
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "additionalProperties": { "$ref": "#/$defs/MetadataValue" }
+    },
+    "VariantValue": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "VariantValues": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/VariantValue" }
+    },
+    "Position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": -10000000,
+          "maximum": 10000000
+        },
+        "y": {
+          "type": "integer",
+          "minimum": -10000000,
+          "maximum": 10000000
+        }
+      }
+    },
+    "Size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000
+        }
+      }
+    },
+    "Discriminator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["values"],
+      "properties": {
+        "values": { "$ref": "#/$defs/VariantValues" }
+      }
+    },
+    "When": {
+      "type": "object",
+      "propertyNames": {
+        "maxLength": 256,
+        "pattern": "^[A-Za-z0-9_-]+$"
+      },
+      "additionalProperties": { "$ref": "#/$defs/VariantValues" }
+    },
+    "Field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "name": { "$ref": "#/$defs/Name" },
+        "type": {
+          "enum": [
+            "uuid",
+            "string",
+            "number",
+            "boolean",
+            "timestamp",
+            "object",
+            "json"
+          ]
+        },
+        "description": { "$ref": "#/$defs/Description" },
+        "tags": { "$ref": "#/$defs/Tags" },
+        "meta": { "$ref": "#/$defs/Metadata" },
+        "array": { "type": "boolean" },
+        "nullable": { "type": "boolean" },
+        "pk": { "type": "boolean" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Field" }
+        },
+        "discriminator": { "$ref": "#/$defs/Discriminator" },
+        "when": { "$ref": "#/$defs/When" }
+      }
+    },
+    "Entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind", "fields"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "name": { "$ref": "#/$defs/Name" },
+        "kind": { "enum": ["event", "api", "db", "other"] },
+        "description": { "$ref": "#/$defs/Description" },
+        "tags": { "$ref": "#/$defs/Tags" },
+        "meta": { "$ref": "#/$defs/Metadata" },
+        "position": { "$ref": "#/$defs/Position" },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Field" }
+        },
+        "collapsed": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Id" }
+        }
+      }
+    },
+    "Process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind", "inputs", "outputs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "name": { "$ref": "#/$defs/Name" },
+        "kind": { "enum": ["event", "api", "db", "other"] },
+        "description": { "$ref": "#/$defs/Description" },
+        "tags": { "$ref": "#/$defs/Tags" },
+        "meta": { "$ref": "#/$defs/Metadata" },
+        "position": { "$ref": "#/$defs/Position" },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Field" }
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Field" }
+        }
+      }
+    },
+    "Boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "name": { "$ref": "#/$defs/Name" },
+        "color": {
+          "enum": ["blue", "green", "purple", "rose", "slate"]
+        },
+        "kind": {
+          "enum": ["domain", "system", "external", "security", "other"]
+        },
+        "description": { "$ref": "#/$defs/Description" },
+        "tags": { "$ref": "#/$defs/Tags" },
+        "meta": { "$ref": "#/$defs/Metadata" },
+        "position": { "$ref": "#/$defs/Position" },
+        "size": { "$ref": "#/$defs/Size" },
+        "members": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Id" }
+        }
+      }
+    },
+    "NodeRelation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceNodeId", "targetNodeId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "sourceNodeId": { "$ref": "#/$defs/Id" },
+        "targetNodeId": { "$ref": "#/$defs/Id" },
+        "label": { "$ref": "#/$defs/Label" },
+        "description": { "$ref": "#/$defs/Description" },
+        "tags": { "$ref": "#/$defs/Tags" },
+        "meta": { "$ref": "#/$defs/Metadata" }
+      }
+    },
+    "Mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceFieldId", "targetFieldId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "sourceFieldId": { "$ref": "#/$defs/Id" },
+        "targetFieldId": { "$ref": "#/$defs/Id" },
+        "kind": { "enum": ["keep", "transform"] },
+        "label": { "$ref": "#/$defs/Label" },
+        "description": { "$ref": "#/$defs/Description" },
+        "tags": { "$ref": "#/$defs/Tags" },
+        "meta": { "$ref": "#/$defs/Metadata" }
+      }
+    }
+  }
+}
