@@ -325,14 +325,19 @@ v1 reader는 이 명세를 만족하는 `format: "fieldweft"`, `version: 1` 문�
 없거나 다른 format·version·enum을 사용한 입력을 위한 dual reader, 자동 migration 또는 repair는
 제공하지 않는다.
 
-v1 지원을 표방하는 reader는 위 property 의미·필수 여부·enum·참조 규칙과 공개 자원 한도를 만족하는
-모든 v1 문서를 읽어야 한다. FieldWeft 공식 웹 Viewer와 validator는 첫 공개일부터 안정판 v2
-reader 공개 후 최소 12개월까지 v1 읽기를 지원한다. 지원 종료가 결정되면 종료일 최소 90일 전에
-공식 release note와 이 명세에 공지한다. 안정판 v2 reader가 공개되지 않은 동안에는 v1 지원 종료일을
-정하지 않는다.
+이 명세의 호환성 보장은 안정판 패키지 버전 `1.0.0`부터 시작한다. 그 전에는 이 명세와 함께 관리되는
+schema, 생성 타입, validator 의미, canonical byte, diagnostics, `d1` transport, 테스트와 fixture가
+하위 호환 없이 변경될 수 있다.
 
-npm 패키지 버전은 이 포맷 버전과 독립적이다. 패키지 major release 자체만으로는 v1 지원을 표방하는
-reader가 이 명세를 만족하는 v1 문서를 거부할 근거가 되지 않는다.
+`1.0.0`부터 안정된 v1 지원을 표방하는 reader는 안정된 v1 property 의미·필수 여부·enum·참조 규칙과
+공개 자원 한도를 만족하는 모든 문서를 읽어야 한다. FieldWeft 공식 웹 Viewer와 validator는
+`1.0.0`부터 안정판 v2 reader 공개 후 최소 12개월까지 안정된 v1 읽기를 지원한다. 지원 종료가
+결정되면 종료일 최소 90일 전에 공식 release note와 이 명세에 공지한다. 안정판 v2 reader가 공개되지
+않은 동안에는 안정된 v1 지원 종료일을 정하지 않는다.
+
+npm 패키지 버전은 이 포맷 버전과 독립적이다. `1.0.0`이 안정된 v1 기준선을 확정한 뒤에는 패키지
+major release 자체만으로 안정된 v1 지원을 표방하는 reader가 안정된 v1 명세를 만족하는 문서를
+거부할 근거가 되지 않는다.
 
 정식 package release에서 diagnostic `code` 또는 `params` key 추가에는 minor release, 사람이 읽는
 diagnostic 메시지 문구만 바꾸는 경우에는 patch release가 필요하다. diagnostic `code` 또는

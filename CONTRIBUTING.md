@@ -38,8 +38,11 @@ Treat the FieldWeft v1 schema, generated types, validator, canonical
 serialization, diagnostics, share codec, normative specification, tests, and
 golden fixtures as one coordinated contract.
 
-- A backward-compatible release must not make a valid FieldWeft v1 document
-  invalid.
+- Compatibility guarantees begin with the stable package version `1.0.0`.
+- Before that release, the FieldWeft v1 specification and all coordinated
+  contract artifacts may change without backward compatibility.
+- From `1.0.0` onward, a backward-compatible release must not invalidate a
+  document that is valid under the stable FieldWeft v1 contract.
 - Do not change canonical bytes, diagnostic codes or parameter meanings, `d1`
   tuple or token output, or golden fixtures as an incidental refactor.
 - When the format changes intentionally, update the schema, generator,
@@ -50,10 +53,10 @@ golden fixtures as one coordinated contract.
 ## Versioning and release channels
 
 Treat the FieldWeft format version and the npm package version as separate
-version axes. A package major release does not, by itself, permit a reader
-claiming v1 support to reject a v1 document that satisfies the format contract.
-This rule applies even when a package major adds a new format or changes its
-JavaScript API.
+version axes. After `1.0.0` establishes the stable v1 baseline, a package major
+release does not, by itself, permit a reader claiming stable v1 support to
+reject a document that satisfies the stable v1 contract. This rule applies
+even when a package major adds a new format or changes its JavaScript API.
 
 For stable package releases:
 
@@ -69,10 +72,8 @@ For stable package releases:
   generically using `severity`, `path`, and `message`.
 - Consumers must ignore unrecognized diagnostic `params` keys.
 
-Breaking changes are allowed between `1.0.0-rc.N` releases. This allowance does
-not relax the frozen v1 document acceptance guarantee. The stable semver policy
-starts with `1.0.0`. Publish RC releases with the npm `next` dist-tag and stable
-releases with `latest`. After publishing `1.0.0`, also move `next` to `1.0.0`.
+Publish RC releases with the npm `next` dist-tag and stable releases with
+`latest`. After publishing `1.0.0`, also move `next` to `1.0.0`.
 
 ## Public API changes
 

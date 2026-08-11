@@ -390,18 +390,24 @@ A v1 reader accepts only documents conforming to this specification with
 automatic migration, or repair for input with missing markers or different
 formats, versions, or enum values.
 
-A reader claiming v1 support must read every v1 document satisfying the
-property meanings, required properties, enums, reference rules, and public
-resource limits above. The official FieldWeft web viewer and validator will
-support reading v1 from the first public release until at least 12 months after
-a stable v2 reader is released. If support retirement is decided, it will be
-announced in official release notes and this specification at least 90 days
-before the retirement date. No v1 retirement date is set while a stable v2
-reader has not been released.
+Compatibility guarantees for this specification begin with the stable package
+version `1.0.0`. Before that release, this specification and its coordinated
+schema, generated types, validator semantics, canonical bytes, diagnostics,
+`d1` transport, tests, and fixtures may change without backward compatibility.
 
-The npm package version is independent of this format version. A package major
-release does not, by itself, permit a reader claiming v1 support to reject a
-document that satisfies this specification.
+From `1.0.0` onward, a reader claiming stable v1 support must read every
+document satisfying the stable v1 property meanings, required properties,
+enums, reference rules, and public resource limits. The official FieldWeft web
+viewer and validator will support reading stable v1 from `1.0.0` until at least
+12 months after a stable v2 reader is released. If support retirement is
+decided, it will be announced in official release notes and this specification
+at least 90 days before the retirement date. No stable v1 retirement date is
+set while a stable v2 reader has not been released.
+
+The npm package version is independent of this format version. After `1.0.0`
+establishes the stable v1 baseline, a package major release does not, by itself,
+permit a reader claiming stable v1 support to reject a document that satisfies
+the stable v1 specification.
 
 For stable package releases, adding a diagnostic `code` or `params` key
 requires a minor release, and changing only human-readable diagnostic message

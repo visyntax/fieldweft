@@ -53,13 +53,22 @@ machine-readable 구조 계약은
 [`schema/fieldweft-v1.schema.json`](schema/fieldweft-v1.schema.json), 공개 golden fixture는
 [`fixtures/`](fixtures/)에 있다.
 
+## 호환성 계약
+
+호환성 보장은 안정판 패키지 버전 `1.0.0`부터 시작한다. 그 전에는 FieldWeft v1 명세와 함께
+관리되는 모든 계약 산출물이 하위 호환 없이 변경될 수 있다. `1.0.0`부터 하위 호환 release는
+안정된 FieldWeft v1 계약에서 유효한 문서를 무효로 만들면 안 된다. schema 동작, 생성 타입,
+validator 의미, canonical byte, diagnostic code와 params 의미, `d1` tuple·token과 golden fixture를
+하나의 계약으로 관리한다.
+
 ## 포맷과 패키지 버전
 
-FieldWeft 포맷 버전과 npm 패키지 버전은 서로 독립된 버전 축이다. 문서의 `version: 1`은
-동결된 v1 wire 계약을 식별하고, 패키지 버전은 reader, writer와 지원 API의 release를 식별한다.
-향후 package major가 다른 포맷을 추가하거나 JavaScript API를 바꾸더라도 v1을 새 이름으로
-바꾸거나 철회하는 것은 아니다. 패키지 major release 자체만으로는 v1 지원을 표방하는 reader가
-포맷 계약을 만족하는 v1 문서를 거부할 근거가 되지 않는다.
+FieldWeft 포맷 버전과 npm 패키지 버전은 서로 독립된 버전 축이다. 문서의 `version: 1`은 현재
+v1 wire 계약을 식별하고, 안정판 패키지 버전 `1.0.0`이 그 계약을 호환성 기준선으로 확정한다.
+패키지 버전은 reader, writer와 지원 API의 release를 식별한다. 향후 package major가 다른 포맷을
+추가하거나 JavaScript API를 바꾸더라도 안정된 v1을 새 이름으로 바꾸거나 철회하는 것은 아니다.
+기준선 확정 뒤에는 패키지 major release 자체만으로 안정된 v1 지원을 표방하는 reader가 안정된
+v1 포맷 계약을 만족하는 문서를 거부할 근거가 되지 않는다.
 
 정식 package release에서 diagnostic 변경은 다음처럼 분류한다. 이 분류가 위 v1 수용 보장을
 완화하지는 않는다.
@@ -75,10 +84,6 @@ FieldWeft 포맷 버전과 npm 패키지 버전은 서로 독립된 버전 축�
 소비자는 알 수 없는 diagnostic `code`를 허용하고 `severity`, `path`, `message`를 사용해 일반
 진단으로 처리해야 한다. 소비자는 알 수 없는 diagnostic `params` key를 무시해야 한다. 그래야
 minor release가 기존 integration을 깨지 않고 진단이나 context를 추가할 수 있다.
-
-`1.0.0-rc.N` 사이에는 breaking change를 허용한다. 위 diagnostic 분류를 포함한 정식 semver
-정책은 `1.0.0`부터 적용한다. 이 prerelease 허용 범위가 동결된 v1 문서 수용 보장을 완화하지는
-않는다.
 
 RC는 npm `next` dist-tag, 정식판은 `latest`로 배포한다. 안정판 `1.0.0`을 공개한 뒤에는
 prerelease 소비자도 같은 안정판으로 모이도록 `next`도 `1.0.0`으로 이동한다.

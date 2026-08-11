@@ -93,20 +93,26 @@ Named canonical and `d1` fixtures are published from [`fixtures/`](fixtures/).
 
 ## Compatibility contracts
 
-A backward-compatible release must preserve the validity of existing valid v1
-documents. Schema behavior, generated types, validator semantics, canonical
-bytes, diagnostic codes and parameter meanings, `d1` tuples and tokens, and
-golden fixtures are maintained as one coordinated contract.
+Compatibility guarantees begin with the stable package version `1.0.0`.
+Before that release, the FieldWeft v1 specification and all coordinated
+contract artifacts may change without backward compatibility. From `1.0.0`
+onward, a backward-compatible release must not invalidate a document that is
+valid under the stable FieldWeft v1 contract. Schema behavior, generated types,
+validator semantics, canonical bytes, diagnostic codes and parameter meanings,
+`d1` tuples and tokens, and golden fixtures are maintained as one coordinated
+contract.
 
 ## Format and package versioning
 
 The FieldWeft format version and the npm package version are separate version
-axes. The document marker `version: 1` identifies the frozen v1 wire contract;
-the package version identifies a release of the reader, writer, and supporting
-APIs. A future package major may add another format or change JavaScript APIs
-without renaming or withdrawing v1. A package major release does not, by
-itself, permit a reader claiming v1 support to reject a v1 document that
-satisfies the format contract.
+axes. The document marker `version: 1` identifies the current v1 wire contract,
+and stable package version `1.0.0` establishes that contract as the compatibility
+baseline. The package version identifies a release of the reader, writer, and
+supporting APIs. A future package major may add another format or change
+JavaScript APIs without renaming or withdrawing stable v1. After the baseline
+is established, a package major release does not, by itself, permit a reader
+claiming stable v1 support to reject a document that satisfies the stable v1
+format contract.
 
 Stable package releases classify diagnostic changes as follows. These
 classifications do not relax the v1 acceptance guarantee above.
@@ -123,11 +129,6 @@ Consumers must tolerate unrecognized diagnostic `code` values and handle them
 generically using `severity`, `path`, and `message`. Consumers must ignore
 unrecognized diagnostic `params` keys. These rules let a minor release add
 diagnostics or context without breaking existing integrations.
-
-`1.0.0-rc.N` releases may contain breaking changes. The stable semver policy,
-including the diagnostic classifications above, starts with `1.0.0`. This
-prerelease allowance does not relax the frozen v1 document acceptance
-guarantee.
 
 RC releases are published with the npm `next` dist-tag, while stable releases
 are published with `latest`. After the stable `1.0.0` release is published,

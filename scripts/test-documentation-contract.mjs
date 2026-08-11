@@ -21,9 +21,24 @@ function requireStatements(relativePath, statements) {
   }
 }
 
+function forbidStatements(relativePath, statements) {
+  const contents = readDocument(relativePath).replaceAll(/\s+/g, ' ')
+  for (const statement of statements) {
+    const normalizedStatement = statement.replaceAll(/\s+/g, ' ')
+    assert.equal(
+      contents.includes(normalizedStatement),
+      false,
+      `${relativePath} contains obsolete documentation contract text: ${statement}`,
+    )
+  }
+}
+
 requireStatements('README.md', [
   'The FieldWeft format version and the npm package version are separate version',
-  'A package major release does not, by itself, permit a reader claiming v1 support to reject a v1 document that satisfies the format contract.',
+  'Compatibility guarantees begin with the stable package version `1.0.0`.',
+  'Before that release, the FieldWeft v1 specification and all coordinated contract artifacts may change without backward compatibility.',
+  'From `1.0.0` onward, a backward-compatible release must not invalidate a document that is valid under the stable FieldWeft v1 contract.',
+  'After the baseline is established, a package major release does not, by itself, permit a reader claiming stable v1 support to reject a document that satisfies the stable v1 format contract.',
   '| Add a diagnostic `code` | Minor |',
   '| Add a diagnostic `params` key | Minor |',
   '| Change only human-readable diagnostic message wording | Patch |',
@@ -31,8 +46,6 @@ requireStatements('README.md', [
   '| Remove or rename a diagnostic `params` key, or change its meaning | Major |',
   'Consumers must tolerate unrecognized diagnostic `code` values and handle them generically using `severity`, `path`, and `message`.',
   'Consumers must ignore unrecognized diagnostic `params` keys.',
-  '`1.0.0-rc.N` releases may contain breaking changes.',
-  'prerelease allowance does not relax the frozen v1 document acceptance',
   'RC releases are published with the npm `next` dist-tag, while stable releases',
   'the `next` tag is also moved to `1.0.0`',
   '[npm release guide](docs/release-guide.md)',
@@ -41,7 +54,10 @@ requireStatements('README.md', [
 
 requireStatements('README.ko.md', [
   'FieldWeft 포맷 버전과 npm 패키지 버전은 서로 독립된 버전 축이다.',
-  '패키지 major release 자체만으로는 v1 지원을 표방하는 reader가 포맷 계약을 만족하는 v1 문서를 거부할 근거가 되지 않는다.',
+  '호환성 보장은 안정판 패키지 버전 `1.0.0`부터 시작한다.',
+  '그 전에는 FieldWeft v1 명세와 함께 관리되는 모든 계약 산출물이 하위 호환 없이 변경될 수 있다.',
+  '`1.0.0`부터 하위 호환 release는 안정된 FieldWeft v1 계약에서 유효한 문서를 무효로 만들면 안 된다.',
+  '기준선 확정 뒤에는 패키지 major release 자체만으로 안정된 v1 지원을 표방하는 reader가 안정된 v1 포맷 계약을 만족하는 문서를 거부할 근거가 되지 않는다.',
   '| diagnostic `code` 추가 | Minor |',
   '| diagnostic `params` key 추가 | Minor |',
   '| 사람이 읽는 diagnostic 메시지 문구만 변경 | Patch |',
@@ -49,8 +65,6 @@ requireStatements('README.ko.md', [
   '| diagnostic `params` key 제거·rename 또는 의미 변경 | Major |',
   '소비자는 알 수 없는 diagnostic `code`를 허용하고 `severity`, `path`, `message`를 사용해 일반 진단으로 처리해야 한다.',
   '소비자는 알 수 없는 diagnostic `params` key를 무시해야 한다.',
-  '`1.0.0-rc.N` 사이에는 breaking change를 허용한다.',
-  'prerelease 허용 범위가 동결된 v1 문서 수용 보장을 완화하지는',
   'RC는 npm `next` dist-tag, 정식판은 `latest`로 배포한다.',
   '`next`도 `1.0.0`으로 이동한다.',
   '[npm release guide](docs/release-guide.md)',
@@ -60,7 +74,10 @@ requireStatements('README.ko.md', [
 for (const relativePath of ['CONTRIBUTING.md', 'AGENTS.md']) {
   requireStatements(relativePath, [
     'Treat the FieldWeft format version and the npm package version as separate',
-    'A package major release does not, by itself, permit a reader claiming v1 support to reject a v1 document that satisfies the format contract.',
+    'Compatibility guarantees begin with the stable package version `1.0.0`.',
+    'Before that release, the FieldWeft v1 specification and all coordinated contract artifacts may change without backward compatibility.',
+    'From `1.0.0` onward, a backward-compatible release must not invalidate a document that is valid under the stable FieldWeft v1 contract.',
+    'After `1.0.0` establishes the stable v1 baseline, a package major release does not, by itself, permit a reader claiming stable v1 support to reject a document that satisfies the stable v1 contract.',
     'Adding a diagnostic `code` requires a minor release.',
     'Adding a diagnostic `params` key requires a minor release.',
     'Changing only human-readable diagnostic message wording requires a patch',
@@ -68,8 +85,6 @@ for (const relativePath of ['CONTRIBUTING.md', 'AGENTS.md']) {
     'Removing or renaming a diagnostic `params` key, or changing its meaning, requires a major release.',
     'Consumers must tolerate unrecognized diagnostic `code` values and handle them generically using `severity`, `path`, and `message`.',
     'Consumers must ignore unrecognized diagnostic `params` keys.',
-    'Breaking changes are allowed between `1.0.0-rc.N` releases.',
-    'does not relax the frozen v1 document acceptance guarantee.',
     'Publish RC releases with the npm `next` dist-tag and stable releases with',
     'After publishing `1.0.0`, also move `next` to `1.0.0`.',
   ])
@@ -87,7 +102,10 @@ requireStatements('AGENTS.md', [
 
 requireStatements('CONTRIBUTING.ko.md', [
   'FieldWeft 포맷 버전과 npm 패키지 버전을 서로 독립된 버전 축으로 다룬다.',
-  '패키지 major release 자체만으로는 v1 지원을 표방하는 reader가 포맷 계약을 만족하는 v1 문서를 거부할 근거가 되지 않는다.',
+  '호환성 보장은 안정판 패키지 버전 `1.0.0`부터 시작한다.',
+  '그 전에는 FieldWeft v1 명세와 함께 관리되는 모든 계약 산출물이 하위 호환 없이 변경될 수 있다.',
+  '`1.0.0`부터 하위 호환 release는 안정된 FieldWeft v1 계약에서 유효한 문서를 무효로 만들면 안 된다.',
+  '`1.0.0`이 안정된 v1 기준선을 확정한 뒤에는 패키지 major release 자체만으로 안정된 v1 지원을 표방하는 reader가 안정된 v1 계약을 만족하는 문서를 거부할 근거가 되지 않는다.',
   'diagnostic `code` 추가에는 minor release가 필요하다.',
   'diagnostic `params` key 추가에는 minor release가 필요하다.',
   '사람이 읽는 diagnostic 메시지 문구만 바꾸는 경우에는 patch release가',
@@ -95,8 +113,6 @@ requireStatements('CONTRIBUTING.ko.md', [
   'diagnostic `params` key를 제거·rename하거나 의미를 바꾸는 경우에는 major release가 필요하다.',
   '소비자는 알 수 없는 diagnostic `code`를 허용하고 `severity`, `path`, `message`를 사용해 일반 진단으로 처리해야 한다.',
   '소비자는 알 수 없는 diagnostic `params` key를 무시해야 한다.',
-  '`1.0.0-rc.N` 사이에는 breaking change를 허용한다.',
-  '동결된 v1 문서 수용 보장은 완화하지 않는다.',
   'RC는 npm `next` dist-tag, 정식판은 `latest`로 배포한다.',
   '`1.0.0` 공개 뒤에는 `next`도 `1.0.0`으로 이동한다.',
   '[npm release guide](docs/release-guide.md)',
@@ -105,7 +121,10 @@ requireStatements('CONTRIBUTING.ko.md', [
 
 requireStatements('docs/code-spec.md', [
   'The npm package version is independent of this format version.',
-  'A package major release does not, by itself, permit a reader claiming v1',
+  'Compatibility guarantees for this specification begin with the stable package version `1.0.0`.',
+  'Before that release, this specification and its coordinated schema, generated types, validator semantics, canonical bytes, diagnostics, `d1` transport, tests, and fixtures may change without backward compatibility.',
+  'From `1.0.0` onward, a reader claiming stable v1 support must read every document satisfying the stable v1 property meanings',
+  'After `1.0.0` establishes the stable v1 baseline, a package major release does not, by itself, permit a reader claiming stable v1 support',
   'adding a diagnostic `code` or `params` key requires a minor release',
   'Removing or renaming either a diagnostic `code` or a diagnostic `params` key, or changing the meaning of either, requires a major release.',
   'Consumers must tolerate unrecognized diagnostic `code` values and handle them generically using `severity`, `path`, and `message`.',
@@ -114,12 +133,34 @@ requireStatements('docs/code-spec.md', [
 
 requireStatements('docs/ko/code-spec.md', [
   'npm 패키지 버전은 이 포맷 버전과 독립적이다.',
-  '패키지 major release 자체만으로는 v1 지원을 표방하는 reader가',
+  '이 명세의 호환성 보장은 안정판 패키지 버전 `1.0.0`부터 시작한다.',
+  '그 전에는 이 명세와 함께 관리되는 schema, 생성 타입, validator 의미, canonical byte, diagnostics, `d1` transport, 테스트와 fixture가 하위 호환 없이 변경될 수 있다.',
+  '`1.0.0`부터 안정된 v1 지원을 표방하는 reader는 안정된 v1 property 의미',
+  '`1.0.0`이 안정된 v1 기준선을 확정한 뒤에는 패키지 major release 자체만으로 안정된 v1 지원을 표방하는 reader가',
   'diagnostic `code` 또는 `params` key 추가에는 minor release',
   'diagnostic `code` 또는 `params` key를 제거·rename하거나 의미를 바꾸는 경우에는 major release가 필요하다.',
   '소비자는 알 수 없는 diagnostic `code`를 허용하고 `severity`, `path`, `message`를 사용해 일반 진단으로 처리해야 한다.',
   '소비자는 알 수 없는 diagnostic `params` key를 무시해야 한다.',
 ])
+
+for (const relativePath of [
+  'AGENTS.md',
+  'CONTRIBUTING.md',
+  'README.md',
+]) {
+  forbidStatements(relativePath, [
+    'Breaking changes are allowed between `1.0.0-rc.N` releases.',
+    '`1.0.0-rc.N` releases may contain breaking changes.',
+    'frozen v1 document acceptance guarantee',
+  ])
+}
+
+for (const relativePath of ['CONTRIBUTING.ko.md', 'README.ko.md']) {
+  forbidStatements(relativePath, [
+    '`1.0.0-rc.N` 사이에는 breaking change를 허용한다.',
+    '동결된 v1 문서 수용 보장',
+  ])
+}
 
 requireStatements('docs/release-guide.md', [
   'Do not create or push a release tag, approve the `npm` GitHub environment, or run `npm publish` without explicit maintainer approval for that release.',

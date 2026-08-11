@@ -25,28 +25,31 @@
 - Treat the v1 schema, validator, canonical serialization, diagnostics, share codec, and golden fixtures as one contract.
 - Change the schema, generated types, validator, specification, and tests together when the format contract changes.
 - Do not change canonical bytes, diagnostic codes or parameter meanings, d1 tokens, or golden fixtures as an incidental refactor.
-- A valid FieldWeft v1 document must not become invalid under a backward-compatible package release.
+- Compatibility guarantees begin with the stable package version `1.0.0`.
+- Before that release, the FieldWeft v1 specification and all coordinated
+  contract artifacts may change without backward compatibility.
+- From `1.0.0` onward, a backward-compatible release must not invalidate a
+  document that is valid under the stable FieldWeft v1 contract.
 
 ## Versioning and release channels
 
 - Treat the FieldWeft format version and the npm package version as separate
   version axes.
-- A package major release does not, by itself, permit a reader claiming v1
-  support to reject a v1 document that satisfies the format contract.
-- Adding a diagnostic `code` requires a minor release.
-- Adding a diagnostic `params` key requires a minor release.
-- Changing only human-readable diagnostic message wording requires a patch
-  release.
-- Removing or renaming a diagnostic `code`, or changing its meaning, requires a
-  major release.
-- Removing or renaming a diagnostic `params` key, or changing its meaning,
-  requires a major release.
+- After `1.0.0` establishes the stable v1 baseline, a package major release
+  does not, by itself, permit a reader claiming stable v1 support to reject a
+  document that satisfies the stable v1 contract.
+- For stable package releases:
+  - Adding a diagnostic `code` requires a minor release.
+  - Adding a diagnostic `params` key requires a minor release.
+  - Changing only human-readable diagnostic message wording requires a patch
+    release.
+  - Removing or renaming a diagnostic `code`, or changing its meaning,
+    requires a major release.
+  - Removing or renaming a diagnostic `params` key, or changing its meaning,
+    requires a major release.
 - Consumers must tolerate unrecognized diagnostic `code` values and handle them
   generically using `severity`, `path`, and `message`.
 - Consumers must ignore unrecognized diagnostic `params` keys.
-- Breaking changes are allowed between `1.0.0-rc.N` releases. This allowance
-  does not relax the frozen v1 document acceptance guarantee. The stable
-  semver policy starts with `1.0.0`.
 - Publish RC releases with the npm `next` dist-tag and stable releases with
   `latest`.
 - After publishing `1.0.0`, also move `next` to `1.0.0`.
