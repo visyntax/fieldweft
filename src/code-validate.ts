@@ -33,6 +33,10 @@ import {
   isReservedFieldWeftMetaKey,
   type ValidFieldWeftDocV1,
 } from './code-model.js'
+import {
+  getOwnEnumerableProperty,
+  hasOwnEnumerableProperty,
+} from './code-property.js'
 
 export type FieldWeftDiagnosticRelated = {
   path: string
@@ -253,7 +257,11 @@ function isPlainRecord(value: unknown): value is RecordValue {
 }
 
 function hasOwn(value: RecordValue, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key)
+  return hasOwnEnumerableProperty(value, key)
+}
+
+function ownValue(value: RecordValue, key: string): unknown {
+  return getOwnEnumerableProperty(value, key)
 }
 
 function pointerToken(value: string): string {
@@ -327,7 +335,7 @@ function requiredName(
 ): string | undefined {
   const key = 'name'
   const keyPath = childPath(path, key)
-  const raw = value[key]
+  const raw = ownValue(value, key)
   if (typeof raw !== 'string') {
     addError(state, 'type.string', keyPath, 'Expected a string.')
     return undefined
@@ -956,7 +964,7 @@ function validateFields(
     checkKnownKeys(raw, FIELD_KEYS, fieldPath, state)
 
     const idPath = childPath(fieldPath, 'id')
-    const id = checkId(raw.id, idPath, state, true)
+    const id = checkId(ownValue(raw, 'id'), idPath, state, true)
     const isUniqueId = id
       ? registerUnique(state.fieldIds, id, idPath, state, 'id.duplicate-field')
       : false
@@ -988,7 +996,7 @@ function validateFields(
     }
 
     const fieldType = checkEnum(
-      raw.type,
+      ownValue(raw, 'type'),
       FIELD_TYPE_VALUES,
       childPath(fieldPath, 'type'),
       state,
@@ -1084,7 +1092,7 @@ function validateNodeIdentity(
   state: ValidationState,
 ): string {
   const idPath = childPath(path, 'id')
-  const id = checkId(raw.id, idPath, state, true)
+  const id = checkId(ownValue(raw, 'id'), idPath, state, true)
   if (id && registerUnique(state.nodeIds, id, idPath, state, 'id.duplicate-node')) {
     state.nodes.set(id, { kind, path: idPath })
     return id
@@ -1100,7 +1108,7 @@ function validateEntity(raw: unknown, path: string, state: ValidationState): voi
   checkKnownKeys(raw, ENTITY_KEYS, path, state)
   const ownerId = validateNodeIdentity(raw, path, 'entity', state)
   requiredName(raw, path, state)
-  checkEnum(raw.kind, ENTITY_KIND_VALUES, childPath(path, 'kind'), state)
+  checkEnum(ownValue(raw, 'kind'), ENTITY_KIND_VALUES, childPath(path, 'kind'), state)
   validateAnnotations(raw, path, state)
   if (hasOwn(raw, 'position')) checkCoordinate(raw.position, childPath(path, 'position'), state)
 
@@ -1134,7 +1142,7 @@ function validateProcess(raw: unknown, path: string, state: ValidationState): vo
   checkKnownKeys(raw, PROCESS_KEYS, path, state)
   const ownerId = validateNodeIdentity(raw, path, 'process', state)
   requiredName(raw, path, state)
-  checkEnum(raw.kind, ENTITY_KIND_VALUES, childPath(path, 'kind'), state)
+  checkEnum(ownValue(raw, 'kind'), ENTITY_KIND_VALUES, childPath(path, 'kind'), state)
   validateAnnotations(raw, path, state)
   if (hasOwn(raw, 'position')) checkCoordinate(raw.position, childPath(path, 'position'), state)
 
@@ -1205,7 +1213,7 @@ function validateMapping(raw: unknown, path: string, state: ValidationState): vo
   }
   checkKnownKeys(raw, MAPPING_KEYS, path, state)
   const idPath = childPath(path, 'id')
-  const id = checkId(raw.id, idPath, state, true)
+  const id = checkId(ownValue(raw, 'id'), idPath, state, true)
   if (id) {
     registerUnique(
       state.relationIds,
@@ -1217,13 +1225,13 @@ function validateMapping(raw: unknown, path: string, state: ValidationState): vo
   }
 
   const sourceFieldId = checkId(
-    raw.sourceFieldId,
+    ownValue(raw, 'sourceFieldId'),
     childPath(path, 'sourceFieldId'),
     state,
     true,
   )
   const targetFieldId = checkId(
-    raw.targetFieldId,
+    ownValue(raw, 'targetFieldId'),
     childPath(path, 'targetFieldId'),
     state,
     true,
@@ -1258,7 +1266,7 @@ function validateNodeRelation(
   }
   checkKnownKeys(raw, NODE_RELATION_KEYS, path, state)
   const idPath = childPath(path, 'id')
-  const id = checkId(raw.id, idPath, state, true)
+  const id = checkId(ownValue(raw, 'id'), idPath, state, true)
   if (id) {
     registerUnique(
       state.relationIds,
@@ -1269,13 +1277,13 @@ function validateNodeRelation(
     )
   }
   const sourceNodeId = checkId(
-    raw.sourceNodeId,
+    ownValue(raw, 'sourceNodeId'),
     childPath(path, 'sourceNodeId'),
     state,
     true,
   )
   const targetNodeId = checkId(
-    raw.targetNodeId,
+    ownValue(raw, 'targetNodeId'),
     childPath(path, 'targetNodeId'),
     state,
     true,
@@ -1642,6 +1650,8 @@ export function validateFieldWeftDocV1(input: unknown): ValidateFieldWeftDocResu
 export function readFieldWeftDoc(input: unknown): ReadFieldWeftDocResult {
   if (
     isRecord(input) &&
+    hasOwn(input, 'format') &&
+    hasOwn(input, 'version') &&
     input.format === FIELD_WEFT_FORMAT &&
     Number.isInteger(input.version) &&
     input.version !== FIELD_WEFT_VERSION_V1

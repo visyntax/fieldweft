@@ -43,6 +43,13 @@ validator enforces ID uniqueness and reserved words, ownership and endpoints,
 field leaf and direction rules, discriminators and `when`, boundary
 membership, cross-references, and aggregate resource limits.
 
+A schema property is present only when it is an own enumerable property of its
+containing object, matching the properties serialized by JSON. An inherited or
+non-enumerable required property is missing, and an inherited or
+non-enumerable optional property is absent. Non-metadata schema objects may
+have custom prototypes when their schema properties follow this rule.
+Metadata maps retain the stricter plain-object or null-prototype requirement.
+
 For preservation and editing by people or AI, see the
 [authoring and editing guide](fieldweft-authoring-guide.md). For projection
 from external models, see the [adapter guide](fieldweft-adapter-guide.md). For

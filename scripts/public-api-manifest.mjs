@@ -524,6 +524,30 @@ export const publicApiManifest = [
 
 export const excludedApiSymbols = [
   {
+    name: 'isReservedFieldWeftId',
+    source: 'src/code-model.ts',
+    disposition: 'internal',
+    reason: 'Validator lookup isolation is an implementation detail, not a package API.',
+  },
+  {
+    name: 'isReservedFieldWeftMetaKey',
+    source: 'src/code-model.ts',
+    disposition: 'internal',
+    reason: 'Validator lookup isolation is an implementation detail, not a package API.',
+  },
+  {
+    name: 'hasOwnEnumerableProperty',
+    source: 'src/code-property.ts',
+    disposition: 'internal',
+    reason: 'Schema-property presence checks are shared package-internal implementation.',
+  },
+  {
+    name: 'getOwnEnumerableProperty',
+    source: 'src/code-property.ts',
+    disposition: 'internal',
+    reason: 'Schema-property reads are shared package-internal implementation.',
+  },
+  {
     name: 'deterministicAdapterId',
     source: 'src/adapter-reference.ts',
     disposition: 'repository-reference',

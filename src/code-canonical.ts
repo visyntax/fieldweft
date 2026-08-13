@@ -23,6 +23,7 @@ import {
   defaultEntityPosition,
   defaultProcessPosition,
 } from './code-layout.js'
+import { getOwnEnumerableProperty } from './code-property.js'
 
 function sorted(values: readonly string[]): string[] {
   return [...values].sort()
@@ -44,10 +45,13 @@ function canonicalAnnotationProps(
   value: FieldWeftAnnotationsV1,
 ): FieldWeftAnnotationsV1 {
   const out: FieldWeftAnnotationsV1 = {}
-  if (value.description) out.description = value.description
-  if (value.tags?.length) out.tags = sorted(value.tags)
-  if (value.meta) {
-    const meta = canonicalMeta(value.meta)
+  const description = getOwnEnumerableProperty(value, 'description')
+  const tags = getOwnEnumerableProperty(value, 'tags')
+  const inputMeta = getOwnEnumerableProperty(value, 'meta')
+  if (description) out.description = description
+  if (tags?.length) out.tags = sorted(tags)
+  if (inputMeta) {
+    const meta = canonicalMeta(inputMeta)
     if (meta) out.meta = meta
   }
   return out
@@ -68,15 +72,18 @@ function canonicalField(field: FieldWeftFieldV1): FieldWeftFieldV1 {
     type: field.type,
     ...canonicalAnnotationProps(field),
   }
-  if (field.array === true) out.array = true
-  if (field.nullable === true) out.nullable = true
-  if (field.pk === true) out.pk = true
-  if (field.children?.length) out.children = field.children.map(canonicalField)
-  if (field.discriminator) {
-    out.discriminator = { values: [...field.discriminator.values] }
+  const children = getOwnEnumerableProperty(field, 'children')
+  const discriminator = getOwnEnumerableProperty(field, 'discriminator')
+  const inputWhen = getOwnEnumerableProperty(field, 'when')
+  if (getOwnEnumerableProperty(field, 'array') === true) out.array = true
+  if (getOwnEnumerableProperty(field, 'nullable') === true) out.nullable = true
+  if (getOwnEnumerableProperty(field, 'pk') === true) out.pk = true
+  if (children?.length) out.children = children.map(canonicalField)
+  if (discriminator) {
+    out.discriminator = { values: [...discriminator.values] }
   }
-  if (field.when) {
-    const when = canonicalWhen(field.when)
+  if (inputWhen) {
+    const when = canonicalWhen(inputWhen)
     if (when) out.when = when
   }
   return out
@@ -86,7 +93,9 @@ function canonicalEntity(
   entity: ValidFieldWeftDocV1['entities'][number],
   index: number,
 ): CanonicalFieldWeftEntityV1 {
-  const position = entity.position ?? defaultEntityPosition(index)
+  const position =
+    getOwnEnumerableProperty(entity, 'position') ?? defaultEntityPosition(index)
+  const collapsed = getOwnEnumerableProperty(entity, 'collapsed')
   const out: CanonicalFieldWeftEntityV1 = {
     id: entity.id,
     name: entity.name,
@@ -95,7 +104,7 @@ function canonicalEntity(
     position: { x: position.x, y: position.y },
     fields: entity.fields.map(canonicalField),
   }
-  if (entity.collapsed?.length) out.collapsed = sorted(entity.collapsed)
+  if (collapsed?.length) out.collapsed = sorted(collapsed)
   return out
 }
 
@@ -103,7 +112,8 @@ function canonicalProcess(
   process: ValidFieldWeftDocV1['processes'][number],
   index: number,
 ): CanonicalFieldWeftProcessV1 {
-  const position = process.position ?? defaultProcessPosition(index)
+  const position =
+    getOwnEnumerableProperty(process, 'position') ?? defaultProcessPosition(index)
   const out: CanonicalFieldWeftProcessV1 = {
     id: process.id,
     name: process.name,
@@ -120,8 +130,14 @@ function canonicalBoundary(
   boundary: ValidFieldWeftDocV1['boundaries'][number],
   index: number,
 ): CanonicalFieldWeftBoundaryV1 {
-  const position = boundary.position ?? defaultBoundaryPosition(index)
-  const size = boundary.size ?? DEFAULT_BOUNDARY_SIZE
+  const position =
+    getOwnEnumerableProperty(boundary, 'position') ??
+    defaultBoundaryPosition(index)
+  const size =
+    getOwnEnumerableProperty(boundary, 'size') ?? DEFAULT_BOUNDARY_SIZE
+  const color = getOwnEnumerableProperty(boundary, 'color')
+  const kind = getOwnEnumerableProperty(boundary, 'kind')
+  const members = getOwnEnumerableProperty(boundary, 'members')
   const out: CanonicalFieldWeftBoundaryV1 = {
     id: boundary.id,
     name: boundary.name,
@@ -129,31 +145,34 @@ function canonicalBoundary(
     position: { x: position.x, y: position.y },
     size: { width: size.width, height: size.height },
   }
-  if (boundary.color) out.color = boundary.color
-  if (boundary.kind) out.kind = boundary.kind
-  if (boundary.members?.length) out.members = sorted(boundary.members)
+  if (color) out.color = color
+  if (kind) out.kind = kind
+  if (members?.length) out.members = sorted(members)
   return out
 }
 
 function canonicalMapping(mapping: FieldWeftMappingV1): FieldWeftMappingV1 {
+  const kind = getOwnEnumerableProperty(mapping, 'kind')
+  const label = getOwnEnumerableProperty(mapping, 'label')
   const out: FieldWeftMappingV1 = {
     id: mapping.id,
     sourceFieldId: mapping.sourceFieldId,
     targetFieldId: mapping.targetFieldId,
   }
-  if (mapping.kind && mapping.kind !== 'keep') out.kind = mapping.kind
-  if (mapping.label) out.label = mapping.label
+  if (kind && kind !== 'keep') out.kind = kind
+  if (label) out.label = label
   Object.assign(out, canonicalAnnotationProps(mapping))
   return out
 }
 
 function canonicalNodeRelation(relation: FieldWeftNodeRelationV1): FieldWeftNodeRelationV1 {
+  const label = getOwnEnumerableProperty(relation, 'label')
   const out: FieldWeftNodeRelationV1 = {
     id: relation.id,
     sourceNodeId: relation.sourceNodeId,
     targetNodeId: relation.targetNodeId,
   }
-  if (relation.label) out.label = relation.label
+  if (label) out.label = label
   Object.assign(out, canonicalAnnotationProps(relation))
   return out
 }

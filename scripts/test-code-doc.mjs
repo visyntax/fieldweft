@@ -182,6 +182,40 @@ function deepFreeze(value, seen = new WeakSet()) {
   return Object.freeze(value)
 }
 
+function movePropertyOutsideJson(value, key, mode) {
+  assert.equal(Object.prototype.propertyIsEnumerable.call(value, key), true)
+  const propertyValue = value[key]
+  delete value[key]
+  if (mode === 'inherited') {
+    const prototype = Object.create(Object.getPrototypeOf(value))
+    Object.defineProperty(prototype, key, {
+      value: propertyValue,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    })
+    Object.setPrototypeOf(value, prototype)
+    return
+  }
+  Object.defineProperty(value, key, {
+    value: propertyValue,
+    enumerable: false,
+    configurable: true,
+    writable: true,
+  })
+}
+
+function addValidNodeRelation(doc, label) {
+  const relation = {
+    id: 'relation',
+    sourceNodeId: 'order',
+    targetNodeId: 'normalize',
+    ...(label ? { label } : {}),
+  }
+  doc.nodeRelations.push(relation)
+  return relation
+}
+
 // production field ID allocation uses a readable slug, 54-bit suffix and collision retry.
 {
   assert.equal(FIELD_ID_SUFFIX_ALPHABET.length, 64)
@@ -250,6 +284,221 @@ function deepFreeze(value, seen = new WeakSet()) {
     assert.equal(arrayResult.kind, 'invalid')
     assert.ok(arrayResult.errors.some((error) => error.path === `/${key}`))
   }
+}
+
+// Schema properties must be own and enumerable to exist at the JSON boundary.
+{
+  for (const mode of ['inherited', 'non-enumerable']) {
+    for (const key of ['format', 'version']) {
+      const doc = makeValidDoc()
+      doc.version = 2
+      movePropertyOutsideJson(doc, key, mode)
+      const result = readFieldWeftDoc(doc)
+      assert.equal(result.kind, 'invalid')
+      assert.ok(
+        result.errors.some((error) => error.path === `/${key}`),
+        `${mode} ${key} must not select unsupported-version dispatch`,
+      )
+    }
+  }
+
+  const requiredProperties = [
+    ['entities', (doc) => [doc, 'entities', '/entities']],
+    ['processes', (doc) => [doc, 'processes', '/processes']],
+    ['boundaries', (doc) => [doc, 'boundaries', '/boundaries']],
+    ['nodeRelations', (doc) => [doc, 'nodeRelations', '/nodeRelations']],
+    ['mappings', (doc) => [doc, 'mappings', '/mappings']],
+    ['entity id', (doc) => [doc.entities[0], 'id', '/entities/0/id']],
+    ['entity name', (doc) => [doc.entities[0], 'name', '/entities/0/name']],
+    ['entity kind', (doc) => [doc.entities[0], 'kind', '/entities/0/kind']],
+    ['entity fields', (doc) => [doc.entities[0], 'fields', '/entities/0/fields']],
+    ['process id', (doc) => [doc.processes[0], 'id', '/processes/0/id']],
+    ['process name', (doc) => [doc.processes[0], 'name', '/processes/0/name']],
+    ['process kind', (doc) => [doc.processes[0], 'kind', '/processes/0/kind']],
+    ['process inputs', (doc) => [doc.processes[0], 'inputs', '/processes/0/inputs']],
+    ['process outputs', (doc) => [doc.processes[0], 'outputs', '/processes/0/outputs']],
+    ['boundary id', (doc) => [doc.boundaries[0], 'id', '/boundaries/0/id']],
+    ['boundary name', (doc) => [doc.boundaries[0], 'name', '/boundaries/0/name']],
+    [
+      'field id',
+      (doc) => [doc.entities[0].fields[0], 'id', '/entities/0/fields/0/id'],
+    ],
+    [
+      'field name',
+      (doc) => [doc.entities[0].fields[0], 'name', '/entities/0/fields/0/name'],
+    ],
+    [
+      'field type',
+      (doc) => [doc.entities[0].fields[0], 'type', '/entities/0/fields/0/type'],
+    ],
+    ['mapping id', (doc) => [doc.mappings[0], 'id', '/mappings/0/id']],
+    [
+      'mapping source',
+      (doc) => [doc.mappings[0], 'sourceFieldId', '/mappings/0/sourceFieldId'],
+    ],
+    [
+      'mapping target',
+      (doc) => [doc.mappings[0], 'targetFieldId', '/mappings/0/targetFieldId'],
+    ],
+    [
+      'node relation id',
+      (doc) => [addValidNodeRelation(doc), 'id', '/nodeRelations/0/id'],
+    ],
+    [
+      'node relation source',
+      (doc) => [
+        addValidNodeRelation(doc),
+        'sourceNodeId',
+        '/nodeRelations/0/sourceNodeId',
+      ],
+    ],
+    [
+      'node relation target',
+      (doc) => [
+        addValidNodeRelation(doc),
+        'targetNodeId',
+        '/nodeRelations/0/targetNodeId',
+      ],
+    ],
+    [
+      'position x',
+      (doc) => [doc.entities[0].position, 'x', '/entities/0/position/x'],
+    ],
+    [
+      'position y',
+      (doc) => [doc.entities[0].position, 'y', '/entities/0/position/y'],
+    ],
+    [
+      'size width',
+      (doc) => [doc.boundaries[0].size, 'width', '/boundaries/0/size/width'],
+    ],
+    [
+      'size height',
+      (doc) => [doc.boundaries[0].size, 'height', '/boundaries/0/size/height'],
+    ],
+    [
+      'discriminator values',
+      (doc) => [
+        doc.entities[0].fields[0].discriminator,
+        'values',
+        '/entities/0/fields/0/discriminator/values',
+      ],
+    ],
+  ]
+
+  for (const mode of ['inherited', 'non-enumerable']) {
+    for (const [name, locate] of requiredProperties) {
+      const doc = makeValidDoc()
+      const [owner, key, path] = locate(doc)
+      movePropertyOutsideJson(owner, key, mode)
+      const result = validateFieldWeftDocV1(doc)
+      assert.equal(result.ok, false, `${mode} required ${name} must fail`)
+      assert.ok(
+        result.errors.some((error) => error.path === path),
+        `${mode} required ${name} must report ${path}`,
+      )
+    }
+  }
+}
+
+// Optional schema properties outside JSON are absent during canonicalization.
+{
+  const optionalProperties = [
+    ['description', (doc) => {
+      doc.entities[0].description = 'Inherited description'
+      return [doc.entities[0], 'description']
+    }],
+    ['tags', (doc) => {
+      doc.entities[0].tags = ['inherited']
+      return [doc.entities[0], 'tags']
+    }],
+    ['meta', (doc) => {
+      doc.entities[0].meta = { owner: 'inherited' }
+      return [doc.entities[0], 'meta']
+    }],
+    ['entity position', (doc) => [doc.entities[0], 'position']],
+    ['process position', (doc) => [doc.processes[0], 'position']],
+    ['boundary position', (doc) => [doc.boundaries[0], 'position']],
+    ['boundary size', (doc) => [doc.boundaries[0], 'size']],
+    ['field array', (doc) => {
+      doc.entities[0].fields[0].array = true
+      return [doc.entities[0].fields[0], 'array']
+    }],
+    ['field nullable', (doc) => {
+      doc.entities[0].fields[0].nullable = true
+      return [doc.entities[0].fields[0], 'nullable']
+    }],
+    ['field pk', (doc) => {
+      doc.entities[0].fields[0].pk = true
+      return [doc.entities[0].fields[0], 'pk']
+    }],
+    ['field children', (doc) => {
+      doc.entities[0].fields[2].children = [
+        { id: 'hidden_child', name: 'hidden', type: 'string' },
+      ]
+      return [doc.entities[0].fields[2], 'children']
+    }],
+    ['field discriminator', (doc) => {
+      doc.entities[0].fields[4].when = { status_f: ['OPEN', 'CLOSED'] }
+      return [doc.entities[0].fields[1], 'discriminator']
+    }],
+    ['field when', (doc) => [doc.entities[0].fields[4], 'when']],
+    ['entity collapsed', (doc) => [doc.entities[0], 'collapsed']],
+    ['boundary color', (doc) => [doc.boundaries[0], 'color']],
+    ['boundary kind', (doc) => [doc.boundaries[0], 'kind']],
+    ['boundary members', (doc) => [doc.boundaries[0], 'members']],
+    ['mapping kind', (doc) => {
+      doc.mappings[0].kind = 'transform'
+      return [doc.mappings[0], 'kind']
+    }],
+    ['mapping label', (doc) => {
+      doc.mappings[0].label = 'Inherited mapping label'
+      return [doc.mappings[0], 'label']
+    }],
+    ['node relation label', (doc) => [
+      addValidNodeRelation(doc, 'Inherited relation label'),
+      'label',
+    ]],
+  ]
+
+  for (const mode of ['inherited', 'non-enumerable']) {
+    for (const [name, locate] of optionalProperties) {
+      const expectedInput = makeValidDoc()
+      const [expectedOwner, expectedKey] = locate(expectedInput)
+      delete expectedOwner[expectedKey]
+      const expected = readCanonicalFieldWeftDoc(expectedInput)
+      assert.equal(expected.ok, true, `baseline for ${name} must be valid`)
+
+      const input = makeValidDoc()
+      const [owner, key] = locate(input)
+      movePropertyOutsideJson(owner, key, mode)
+      const actual = readCanonicalFieldWeftDoc(input)
+      assert.equal(actual.ok, true, `${mode} optional ${name} must be absent`)
+      assert.deepEqual(actual.doc, expected.doc)
+    }
+  }
+}
+
+// Custom prototypes remain valid when schema properties are own and enumerable.
+{
+  const customPrototype = makeValidDoc()
+  customPrototype.entities[0] = Object.assign(
+    Object.create({ inheritedUnknown: true }),
+    customPrototype.entities[0],
+  )
+  assert.equal(validateFieldWeftDocV1(customPrototype).ok, true)
+
+  const nullPrototypeMeta = makeValidDoc()
+  nullPrototypeMeta.entities[0].meta = Object.assign(Object.create(null), {
+    owner: 'payments',
+  })
+  const canonical = readCanonicalFieldWeftDoc(nullPrototypeMeta)
+  assert.equal(canonical.ok, true)
+  assert.equal(canonical.doc.entities[0].meta.owner, 'payments')
+  assert.equal(Object.getPrototypeOf(canonical.doc.entities[0].meta), null)
+
+  const parsed = JSON.parse(JSON.stringify(makeValidDoc()))
+  assert.equal(validateFieldWeftDocV1(parsed).ok, true)
 }
 
 // schema와 TypeScript validator는 공통 구조 fixture에서 같은 판정을 낸다.

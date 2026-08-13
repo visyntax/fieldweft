@@ -36,6 +36,11 @@ FieldWeft는 데이터 계보를 시각화한 캔버스 문서를 저장하고 �
 validator는 ID 고유성·예약어, 소유자와 endpoint, field leaf·방향, discriminator·when,
 boundary membership, 교차 참조와 전체 자원 제한을 담당한다.
 
+schema property는 JSON에 직렬화되는 own enumerable property일 때만 존재한다. 상속되었거나
+non-enumerable인 required property는 누락으로, optional property는 부재로 취급한다. metadata가
+아닌 schema 객체는 이 property 규칙을 지키면 custom prototype을 가질 수 있다. metadata map은
+기존의 더 엄격한 plain object 또는 null prototype 조건을 유지한다.
+
 사람·AI가 문서를 보존하며 고치는 방법은 [`작성·수정 가이드`](fieldweft-authoring-guide.md), 외부
 모델 투영은 [`adapter 가이드`](fieldweft-adapter-guide.md), `#g=d1.…` transport는
 [`공유 가이드`](fieldweft-sharing-guide.md)를 따른다.

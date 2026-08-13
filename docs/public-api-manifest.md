@@ -255,6 +255,10 @@ The first `fieldweft-web` release MUST NOT retain superseded v1 aliases for thes
 
 | Current name | Source | Disposition | Reason |
 |---|---|---|---|
+| `isReservedFieldWeftId` | `src/code-model.ts` | `internal` | Validator lookup isolation is an implementation detail, not a package API. |
+| `isReservedFieldWeftMetaKey` | `src/code-model.ts` | `internal` | Validator lookup isolation is an implementation detail, not a package API. |
+| `hasOwnEnumerableProperty` | `src/code-property.ts` | `internal` | Schema-property presence checks are shared package-internal implementation. |
+| `getOwnEnumerableProperty` | `src/code-property.ts` | `internal` | Schema-property reads are shared package-internal implementation. |
 | `deterministicAdapterId` | `src/adapter-reference.ts` | `repository-reference` | The packaged adapter source is copied by consumers, not imported as a package API. |
 | `BOUNDARY_KIND_VALUES` | `src/boundary-kind.ts` | `generated-replacement` | Use FIELD_WEFT_BOUNDARY_KINDS_V1 from generated output. |
 | `BoundaryKind` | `src/boundary-kind.ts` | `generated-replacement` | Use FieldWeftBoundaryKindV1 from generated output. |
