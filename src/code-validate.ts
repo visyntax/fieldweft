@@ -1,6 +1,6 @@
-import { BOUNDARY_KIND_VALUES } from './boundary-kind.js'
 import {
-  FIELD_WEFT_BOUNDARY_COLORS_V1 as BOUNDARY_COLOR_VALUES,
+  FIELD_WEFT_BOUNDARY_COLORS_V1,
+  FIELD_WEFT_BOUNDARY_KINDS_V1,
   FIELD_WEFT_ENTITY_KINDS_V1,
   FIELD_WEFT_FIELD_TYPES_V1,
   FIELD_WEFT_FORMAT,
@@ -28,9 +28,9 @@ import {
   FIELD_WEFT_MAX_RELATIONS_V1,
   FIELD_WEFT_MAX_TOTAL_TAGS_V1,
   FIELD_WEFT_MAX_COORD_V1,
-  FIELD_WEFT_RESERVED_IDS,
-  FIELD_WEFT_RESERVED_META_KEYS,
   FIELD_WEFT_RESERVED_META_PREFIX,
+  isReservedFieldWeftId,
+  isReservedFieldWeftMetaKey,
   type ValidFieldWeftDocV1,
 } from './code-model.js'
 
@@ -129,6 +129,15 @@ type ValidationState = {
 }
 
 const ID_RE = /^[A-Za-z0-9_-]+$/
+const BOUNDARY_COLOR_VALUES = Object.freeze([
+  ...FIELD_WEFT_BOUNDARY_COLORS_V1,
+])
+const BOUNDARY_KIND_VALUES = Object.freeze([
+  ...FIELD_WEFT_BOUNDARY_KINDS_V1,
+])
+const ENTITY_KIND_VALUES = Object.freeze([...FIELD_WEFT_ENTITY_KINDS_V1])
+const FIELD_TYPE_VALUES = Object.freeze([...FIELD_WEFT_FIELD_TYPES_V1])
+const MAPPING_KIND_VALUES = Object.freeze([...FIELD_WEFT_MAPPING_KINDS_V1])
 
 function exceedsCodePointLimit(value: string, limit: number): boolean {
   let length = 0
@@ -533,7 +542,7 @@ function validateAnnotations(
         FIELD_WEFT_MAX_META_KEY_CHARS_V1,
         'limit.string.meta-key',
       )
-      if (FIELD_WEFT_RESERVED_META_KEYS.has(key)) {
+      if (isReservedFieldWeftMetaKey(key)) {
         addError(
           state,
           'meta.key-reserved',
@@ -634,7 +643,7 @@ function checkId(
     )
     return undefined
   }
-  if (rejectReserved && FIELD_WEFT_RESERVED_IDS.has(value)) {
+  if (rejectReserved && isReservedFieldWeftId(value)) {
     addError(state, 'id.reserved', path, `ID "${value}" is reserved.`, {
       id: value,
     })
@@ -980,7 +989,7 @@ function validateFields(
 
     const fieldType = checkEnum(
       raw.type,
-      FIELD_WEFT_FIELD_TYPES_V1,
+      FIELD_TYPE_VALUES,
       childPath(fieldPath, 'type'),
       state,
     )
@@ -1091,7 +1100,7 @@ function validateEntity(raw: unknown, path: string, state: ValidationState): voi
   checkKnownKeys(raw, ENTITY_KEYS, path, state)
   const ownerId = validateNodeIdentity(raw, path, 'entity', state)
   requiredName(raw, path, state)
-  checkEnum(raw.kind, FIELD_WEFT_ENTITY_KINDS_V1, childPath(path, 'kind'), state)
+  checkEnum(raw.kind, ENTITY_KIND_VALUES, childPath(path, 'kind'), state)
   validateAnnotations(raw, path, state)
   if (hasOwn(raw, 'position')) checkCoordinate(raw.position, childPath(path, 'position'), state)
 
@@ -1125,7 +1134,7 @@ function validateProcess(raw: unknown, path: string, state: ValidationState): vo
   checkKnownKeys(raw, PROCESS_KEYS, path, state)
   const ownerId = validateNodeIdentity(raw, path, 'process', state)
   requiredName(raw, path, state)
-  checkEnum(raw.kind, FIELD_WEFT_ENTITY_KINDS_V1, childPath(path, 'kind'), state)
+  checkEnum(raw.kind, ENTITY_KIND_VALUES, childPath(path, 'kind'), state)
   validateAnnotations(raw, path, state)
   if (hasOwn(raw, 'position')) checkCoordinate(raw.position, childPath(path, 'position'), state)
 
@@ -1220,7 +1229,7 @@ function validateMapping(raw: unknown, path: string, state: ValidationState): vo
     true,
   )
   if (hasOwn(raw, 'kind')) {
-    checkEnum(raw.kind, FIELD_WEFT_MAPPING_KINDS_V1, childPath(path, 'kind'), state)
+    checkEnum(raw.kind, MAPPING_KIND_VALUES, childPath(path, 'kind'), state)
   }
   optionalString(
     raw,
@@ -1298,7 +1307,7 @@ function validateNodeRelation(
 function validateWhenReferences(state: ValidationState): void {
   for (const ref of state.whenRefs) {
     for (const [discriminatorId, rawValues] of Object.entries(ref.when)) {
-      if (!ID_RE.test(discriminatorId) || FIELD_WEFT_RESERVED_IDS.has(discriminatorId)) continue
+      if (!ID_RE.test(discriminatorId) || isReservedFieldWeftId(discriminatorId)) continue
       const path = childPath(ref.path, discriminatorId)
       if (ref.fieldId === discriminatorId) {
         addError(

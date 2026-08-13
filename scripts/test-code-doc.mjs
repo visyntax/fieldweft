@@ -20,6 +20,11 @@ if (schemaCheck.status !== 0) {
 }
 
 const {
+  FIELD_WEFT_BOUNDARY_COLORS_V1,
+  FIELD_WEFT_BOUNDARY_KINDS_V1,
+  FIELD_WEFT_ENTITY_KINDS_V1,
+  FIELD_WEFT_FIELD_TYPES_V1,
+  FIELD_WEFT_MAPPING_KINDS_V1,
   FIELD_WEFT_MAX_DESCRIPTION_CHARS_V1,
   FIELD_WEFT_MAX_FIELD_DEPTH_V1,
   FIELD_WEFT_MAX_FIELDS_V1,
@@ -36,6 +41,8 @@ const {
   FIELD_WEFT_MAX_VARIANT_VALUE_CHARS_V1,
   FIELD_WEFT_MAX_VARIANT_VALUES_V1,
   FIELD_WEFT_MAX_COORD_V1,
+  FIELD_WEFT_RESERVED_IDS,
+  FIELD_WEFT_RESERVED_META_KEYS,
 } = await import('../dist/index.js')
 const { readFieldWeftDoc, validateFieldWeftDocV1 } = await import('../dist/index.js')
 const {
@@ -273,6 +280,54 @@ function deepFreeze(value, seen = new WeakSet()) {
   const invalidEnumDoc = makeValidDoc()
   invalidEnumDoc.entities[0].kind = 'etc'
   errorWithCode(validateFieldWeftDocV1(invalidEnumDoc), 'value.enum')
+}
+
+// Public vocabulary and reserved-key views cannot mutate validator rules.
+{
+  const vocabularies = [
+    FIELD_WEFT_BOUNDARY_COLORS_V1,
+    FIELD_WEFT_BOUNDARY_KINDS_V1,
+    FIELD_WEFT_ENTITY_KINDS_V1,
+    FIELD_WEFT_FIELD_TYPES_V1,
+    FIELD_WEFT_MAPPING_KINDS_V1,
+  ]
+  const invalidEnumDoc = makeValidDoc()
+  invalidEnumDoc.entities[0].kind = 'mutated'
+  assert.equal(validateFieldWeftDocV1(invalidEnumDoc).ok, false)
+
+  for (const vocabulary of vocabularies) {
+    const before = [...vocabulary]
+    assert.equal(Object.isFrozen(vocabulary), true)
+    assert.throws(() => vocabulary.push('mutated'), TypeError)
+    assert.throws(() => vocabulary.reverse(), TypeError)
+    assert.deepEqual(vocabulary, before)
+  }
+  assert.equal(validateFieldWeftDocV1(invalidEnumDoc).ok, false)
+
+  for (const reserved of [
+    FIELD_WEFT_RESERVED_IDS,
+    FIELD_WEFT_RESERVED_META_KEYS,
+  ]) {
+    assert.equal(Object.isFrozen(reserved), true)
+    assert.equal(Object.prototype.toString.call(reserved), '[object Set]')
+    assert.deepEqual([...reserved], ['__proto__', 'prototype', 'constructor'])
+    assert.throws(() => reserved.delete('__proto__'), TypeError)
+    assert.throws(() => reserved.add('ordinary'), TypeError)
+    assert.throws(() => reserved.clear(), TypeError)
+    assert.equal(reserved.has('__proto__'), true)
+    assert.equal(reserved.has('ordinary'), false)
+  }
+
+  const reservedId = makeValidDoc()
+  reservedId.entities[0].id = '__proto__'
+  errorWithCode(validateFieldWeftDocV1(reservedId), 'id.reserved')
+
+  const reservedMeta = makeValidDoc()
+  reservedMeta.entities[0].meta = Object.create(null)
+  reservedMeta.entities[0].meta.__proto__ = 'blocked'
+  errorWithCode(validateFieldWeftDocV1(reservedMeta), 'meta.key-reserved')
+
+  assert.equal(validateFieldWeftDocV1(makeValidDoc()).ok, true)
 }
 
 // validation never repairs or mutates invalid input, including frozen objects.

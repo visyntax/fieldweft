@@ -18,6 +18,10 @@ function literal(value) {
   return JSON.stringify(value)
 }
 
+function frozenTuple(value) {
+  return `Object.freeze(${literal(value)} as const)`
+}
+
 function indentBlock(value, spaces) {
   const indent = ' '.repeat(spaces)
   return value.split('\n').map((line) => `${indent}${line}`).join('\n')
@@ -88,11 +92,11 @@ const lines = [
   '',
   `export const FIELD_WEFT_FORMAT = ${literal(schema.properties.format.const)} as const`,
   `export const FIELD_WEFT_VERSION_V1 = ${literal(schema.properties.version.const)} as const`,
-  `export const FIELD_WEFT_FIELD_TYPES_V1 = ${literal(enumValues('Field', 'type'))} as const`,
-  `export const FIELD_WEFT_ENTITY_KINDS_V1 = ${literal(enumValues('Entity', 'kind'))} as const`,
-  `export const FIELD_WEFT_BOUNDARY_COLORS_V1 = ${literal(enumValues('Boundary', 'color'))} as const`,
-  `export const FIELD_WEFT_BOUNDARY_KINDS_V1 = ${literal(enumValues('Boundary', 'kind'))} as const`,
-  `export const FIELD_WEFT_MAPPING_KINDS_V1 = ${literal(enumValues('Mapping', 'kind'))} as const`,
+  `export const FIELD_WEFT_FIELD_TYPES_V1 = ${frozenTuple(enumValues('Field', 'type'))}`,
+  `export const FIELD_WEFT_ENTITY_KINDS_V1 = ${frozenTuple(enumValues('Entity', 'kind'))}`,
+  `export const FIELD_WEFT_BOUNDARY_COLORS_V1 = ${frozenTuple(enumValues('Boundary', 'color'))}`,
+  `export const FIELD_WEFT_BOUNDARY_KINDS_V1 = ${frozenTuple(enumValues('Boundary', 'kind'))}`,
+  `export const FIELD_WEFT_MAPPING_KINDS_V1 = ${frozenTuple(enumValues('Mapping', 'kind'))}`,
   `export const FIELD_WEFT_MAX_ID_CHARS_V1 = ${maxLength('Id')} as const`,
   `export const FIELD_WEFT_MAX_NAME_CHARS_V1 = ${maxLength('Name')} as const`,
   `export const FIELD_WEFT_MAX_LABEL_CHARS_V1 = ${maxLength('Label')} as const`,

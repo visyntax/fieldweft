@@ -1,10 +1,12 @@
 import {
-  FIELD_WEFT_BOUNDARY_COLORS_V1 as BOUNDARY_COLOR_VALUES,
+  FIELD_WEFT_BOUNDARY_COLORS_V1,
+  FIELD_WEFT_BOUNDARY_KINDS_V1,
   FIELD_WEFT_ENTITY_KINDS_V1,
   FIELD_WEFT_FIELD_TYPES_V1,
   FIELD_WEFT_FORMAT,
   FIELD_WEFT_MAPPING_KINDS_V1,
   FIELD_WEFT_VERSION_V1,
+  type FieldWeftBoundaryKindV1,
   type FieldWeftBoundaryV1,
   type FieldWeftDocV1,
   type FieldWeftEntityV1,
@@ -15,10 +17,6 @@ import {
   type FieldWeftNodeRelationV1,
   type FieldWeftWhenV1,
 } from './fieldweft-v1.generated.js'
-import {
-  BOUNDARY_KIND_VALUES,
-  type BoundaryKind,
-} from './boundary-kind.js'
 import {
   FIELD_WEFT_MAX_FIELD_DEPTH_V1,
   FIELD_WEFT_MAX_FIELDS_V1,
@@ -43,6 +41,15 @@ const SHARE_TOKEN_PREFIX = `${FIELD_WEFT_SHARE_FORMAT}.`
 const BASE64URL_ALPHABET =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
 const BASE64URL_RE = /^[A-Za-z0-9_-]+$/
+const BOUNDARY_COLOR_VALUES = Object.freeze([
+  ...FIELD_WEFT_BOUNDARY_COLORS_V1,
+])
+const BOUNDARY_KIND_VALUES = Object.freeze([
+  ...FIELD_WEFT_BOUNDARY_KINDS_V1,
+])
+const ENTITY_KIND_VALUES = Object.freeze([...FIELD_WEFT_ENTITY_KINDS_V1])
+const FIELD_TYPE_VALUES = Object.freeze([...FIELD_WEFT_FIELD_TYPES_V1])
+const MAPPING_KIND_VALUES = Object.freeze([...FIELD_WEFT_MAPPING_KINDS_V1])
 
 export type FieldWeftShareEncodeResult =
   | { kind: 'ok'; token: string; tokenChars: number; jsonBytes: number }
@@ -97,7 +104,7 @@ type ParsedBoundary = FieldWeftAnnotationsV1 & {
   height: number
   members?: number[]
   color?: BoundaryColor
-  kind?: BoundaryKind
+  kind?: FieldWeftBoundaryKindV1
   description?: string
 }
 
@@ -511,7 +518,7 @@ function packField(
   const tuple: unknown[] = [
     field.id,
     field.name,
-    enumIndex(FIELD_WEFT_FIELD_TYPES_V1, field.type, childPath(path, 2)),
+    enumIndex(FIELD_TYPE_VALUES, field.type, childPath(path, 2)),
     flags,
   ]
   tuple.push(
@@ -607,7 +614,7 @@ export function packFieldWeftShareDocV1(doc: CanonicalFieldWeftDocV1): unknown[]
     const tuple: unknown[] = [
       entity.id,
       entity.name,
-      enumIndex(FIELD_WEFT_ENTITY_KINDS_V1, entity.kind, childPath(path, 2)),
+      enumIndex(ENTITY_KIND_VALUES, entity.kind, childPath(path, 2)),
       x,
       y,
       entity.fields.map((field, fieldIndex) =>
@@ -637,7 +644,7 @@ export function packFieldWeftShareDocV1(doc: CanonicalFieldWeftDocV1): unknown[]
     const tuple: unknown[] = [
       process.id,
       process.name,
-      enumIndex(FIELD_WEFT_ENTITY_KINDS_V1, process.kind, childPath(path, 2)),
+      enumIndex(ENTITY_KIND_VALUES, process.kind, childPath(path, 2)),
       x,
       y,
       process.inputs.map((field, fieldIndex) =>
@@ -695,7 +702,7 @@ export function packFieldWeftShareDocV1(doc: CanonicalFieldWeftDocV1): unknown[]
     tuple.push(
       ...trimTail([
         mapping.kind && mapping.kind !== 'keep'
-          ? enumIndex(FIELD_WEFT_MAPPING_KINDS_V1, mapping.kind, childPath(path, 3)) + 1
+          ? enumIndex(MAPPING_KIND_VALUES, mapping.kind, childPath(path, 3)) + 1
           : 0,
         mapping.label ?? 0,
         packAnnotations(mapping),
@@ -828,7 +835,7 @@ function unpackFields(
     const field: FieldWeftFieldV1 = {
       id: expectString(tuple[0], childPath(fieldPath, 0)),
       name: expectString(tuple[1], childPath(fieldPath, 1)),
-      type: expectEnumIndex(tuple[2], FIELD_WEFT_FIELD_TYPES_V1, childPath(fieldPath, 2)),
+      type: expectEnumIndex(tuple[2], FIELD_TYPE_VALUES, childPath(fieldPath, 2)),
     }
     state.fields.push(field)
     if (flags & F_ARRAY) field.array = true
@@ -1006,7 +1013,7 @@ export function unpackFieldWeftShareDocV1(value: unknown): FieldWeftDocV1 {
     const entity: FieldWeftEntityV1 = {
       id: expectString(tuple[0], childPath(path, 0)),
       name: expectString(tuple[1], childPath(path, 1)),
-      kind: expectEnumIndex(tuple[2], FIELD_WEFT_ENTITY_KINDS_V1, childPath(path, 2)),
+      kind: expectEnumIndex(tuple[2], ENTITY_KIND_VALUES, childPath(path, 2)),
       position: restoreNodePosition(
         tuple,
         path,
@@ -1042,7 +1049,7 @@ export function unpackFieldWeftShareDocV1(value: unknown): FieldWeftDocV1 {
     return {
       id: expectString(tuple[0], childPath(path, 0)),
       name: expectString(tuple[1], childPath(path, 1)),
-      kind: expectEnumIndex(tuple[2], FIELD_WEFT_ENTITY_KINDS_V1, childPath(path, 2)),
+      kind: expectEnumIndex(tuple[2], ENTITY_KIND_VALUES, childPath(path, 2)),
       position: restoreNodePosition(
         tuple,
         path,
@@ -1151,7 +1158,7 @@ export function unpackFieldWeftShareDocV1(value: unknown): FieldWeftDocV1 {
         expectIndex(tuple[2], state.fields.length, childPath(path, 2))
       ].id,
     }
-    const kind = optionalEnumSlot(tuple, 3, FIELD_WEFT_MAPPING_KINDS_V1, path)
+    const kind = optionalEnumSlot(tuple, 3, MAPPING_KIND_VALUES, path)
     if (kind === 'keep') {
       return fail(
         'tuple.mapping-default-kind',

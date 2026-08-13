@@ -31,18 +31,85 @@ export const FIELD_WEFT_MAX_TOTAL_TAGS_V1 = 100_000
 export const FIELD_WEFT_MAX_TOTAL_META_ENTRIES_V1 = 100_000
 export const FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1 = 4_000_000
 
-/** Persistent IDs reserve keys that collide with ordinary object prototypes. */
-export const FIELD_WEFT_RESERVED_IDS: ReadonlySet<string> = new Set([
+const RESERVED_ID_VALUES = [
   '__proto__',
   'prototype',
   'constructor',
-])
+] as const
 
-export const FIELD_WEFT_RESERVED_META_KEYS: ReadonlySet<string> = new Set([
+const RESERVED_META_KEY_VALUES = [
   '__proto__',
   'prototype',
   'constructor',
-])
+] as const
+
+const reservedIdLookup = new Set<string>(RESERVED_ID_VALUES)
+const reservedMetaKeyLookup = new Set<string>(RESERVED_META_KEY_VALUES)
+
+class ImmutableStringSet implements ReadonlySet<string> {
+  readonly #values: Set<string>
+
+  constructor(values: Iterable<string>) {
+    this.#values = new Set(values)
+    Object.freeze(this)
+  }
+
+  get size(): number {
+    return this.#values.size
+  }
+
+  has(value: string): boolean {
+    return this.#values.has(value)
+  }
+
+  entries(): SetIterator<[string, string]> {
+    return this.#values.entries()
+  }
+
+  keys(): SetIterator<string> {
+    return this.#values.keys()
+  }
+
+  values(): SetIterator<string> {
+    return this.#values.values()
+  }
+
+  forEach(
+    callback: (value: string, value2: string, set: ReadonlySet<string>) => void,
+    thisArg?: unknown,
+  ): void {
+    for (const value of this.#values) {
+      callback.call(thisArg, value, value, this)
+    }
+  }
+
+  [Symbol.iterator](): SetIterator<string> {
+    return this.#values[Symbol.iterator]()
+  }
+
+  get [Symbol.toStringTag](): string {
+    return 'Set'
+  }
+}
+
+Object.freeze(ImmutableStringSet.prototype)
+
+/** Persistent IDs reserve keys that collide with ordinary object prototypes. */
+export const FIELD_WEFT_RESERVED_IDS: ReadonlySet<string> =
+  new ImmutableStringSet(RESERVED_ID_VALUES)
+
+export const FIELD_WEFT_RESERVED_META_KEYS: ReadonlySet<string> =
+  new ImmutableStringSet(RESERVED_META_KEY_VALUES)
+
+/** @internal Stable validator lookup independent from the exported set facade. */
+export function isReservedFieldWeftId(value: string): boolean {
+  return reservedIdLookup.has(value)
+}
+
+/** @internal Stable validator lookup independent from the exported set facade. */
+export function isReservedFieldWeftMetaKey(value: string): boolean {
+  return reservedMetaKeyLookup.has(value)
+}
 
 export const FIELD_WEFT_RESERVED_META_PREFIX = 'fieldweft.'
 
