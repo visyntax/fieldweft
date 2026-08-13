@@ -77,7 +77,9 @@ length-prefixed UTF-8 tuple containing the object kind and source identity with
 SHA-256, then uses the first 96 bits as a 16-character base64url suffix. This
 algorithm is not a JSON validity condition. Object kind means a classification
 such as `entity`, `process`, `boundary`, `field`, `nodeRelation`, or `mapping`,
-and is distinct from a display-facing `kind` property.
+and is distinct from a display-facing `kind` property. The repository reference
+helper limits its ASCII object kind to 239 characters so the separator and
+16-character suffix keep the complete ID within the 256-character ID limit.
 
 When editing an existing document, preserve IDs for renamed, reordered, or
 moved fields and for unchanged nodes, fields, boundaries, and relations.

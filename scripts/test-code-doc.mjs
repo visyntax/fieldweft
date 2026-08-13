@@ -1937,6 +1937,14 @@ let annotatedCanonical
     await deterministicAdapterId('entity', ['cafe\u0301']),
     'Unicode identity must remain unnormalized without source-system rules.',
   )
+  const maximumAdapterId = await deterministicAdapterId('a'.repeat(239), [
+    'source',
+  ])
+  assert.equal(maximumAdapterId.length, FIELD_WEFT_MAX_ID_CHARS_V1)
+  await assert.rejects(
+    deterministicAdapterId('a'.repeat(240), ['source']),
+    /objectKind must be at most 239 characters/,
+  )
 
   const adapterGuide = readFileSync(
     join(root, 'docs', 'fieldweft-adapter-guide.md'),
@@ -1955,6 +1963,7 @@ let annotatedCanonical
     'Do not add a separate part count.',
     'do not apply Unicode normalization',
     'fail explicitly instead of appending an arbitrary suffix',
+    'at most 239 ASCII characters',
   ]) {
     assert.equal(
       normalizedAdapterGuide.includes(decision),

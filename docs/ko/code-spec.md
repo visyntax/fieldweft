@@ -60,7 +60,8 @@ non-enumerable인 required property는 누락으로, optional property는 부재
 결정적 ID가 필요한 adapter의 참고 알고리즘은 object kind와 source identity로 구성한
 길이-prefix UTF-8 tuple을 SHA-256으로 해시하고, 앞 96비트를 16자 base64url suffix로 사용한다.
 이는 JSON 유효성 조건이 아니다. object kind는 `entity`, `process`, `boundary`, `field`,
-`nodeRelation`, `mapping` 같은 객체 분류이며 표시용 `kind`와 구분한다.
+`nodeRelation`, `mapping` 같은 객체 분류이며 표시용 `kind`와 구분한다. 저장소 참고 helper는 ASCII
+object kind를 239자로 제한해 구분자와 16자 suffix를 더한 전체 ID가 256자 제한 안에 들게 한다.
 
 기존 문서를 수정할 때 rename·reorder·move된 field와 변경되지 않은 node, field, boundary,
 relation의 ID를 보존한다. 변경하지 않은 layout과 실제 source 순서가 바뀌지 않은 배열 순서도

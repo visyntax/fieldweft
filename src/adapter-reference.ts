@@ -6,6 +6,13 @@ const RESERVED_ID_COMPONENTS = new Set([
 ])
 const BASE64URL =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+const ID_SEPARATOR_CHARS = 1
+const DIGEST_PREFIX_BYTES = 12
+const DIGEST_SUFFIX_CHARS = 16
+// Keep this copy-only reference limit synchronized with FIELD_WEFT_MAX_ID_CHARS_V1.
+const FIELD_WEFT_MAX_ID_CHARS = 256
+const MAX_OBJECT_KIND_CHARS =
+  FIELD_WEFT_MAX_ID_CHARS - ID_SEPARATOR_CHARS - DIGEST_SUFFIX_CHARS
 
 function encodeLengthPrefixed(
   parts: readonly string[],
@@ -59,6 +66,11 @@ export async function deterministicAdapterId(
   ) {
     throw new Error('objectKind must be an unreserved FieldWeft ID segment.')
   }
+  if (objectKind.length > MAX_OBJECT_KIND_CHARS) {
+    throw new Error(
+      `objectKind must be at most ${MAX_OBJECT_KIND_CHARS} characters so the resulting ID fits the FieldWeft limit.`,
+    )
+  }
   if (sourceIdentity.length === 0) {
     throw new Error('sourceIdentity must contain at least one segment.')
   }
@@ -66,5 +78,5 @@ export async function deterministicAdapterId(
   const digest = new Uint8Array(
     await crypto.subtle.digest('SHA-256', tuple.buffer),
   )
-  return `${objectKind}_${encodeBase64Url(digest.subarray(0, 12))}`
+  return `${objectKind}_${encodeBase64Url(digest.subarray(0, DIGEST_PREFIX_BYTES))}`
 }

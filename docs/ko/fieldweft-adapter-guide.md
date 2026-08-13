@@ -82,6 +82,9 @@ label 또는 annotation 변경은 remove/add가 아니라 같은 ID의 property 
   source tuple 사이의 96비트 hash 충돌을 직접 기억하거나 판정하지 않는다. 호출자는 같은 ID 공간에서
   source tuple과 결과 ID를 등록하고, 서로 다른 tuple이 같은 ID가 되면 임의 suffix를 붙이지 말고
   명시적으로 실패해야 한다.
+- `objectKind`는 예약되지 않은 FieldWeft ID 조각이며 최대 239 ASCII 문자여야 한다. `_` 구분자와
+  16자 suffix를 더하면 전체 ID가 v1의 256자 제한 안에 들어간다. helper는 긴 앞부분을 자르지 않고
+  거부한다.
 
 source system이 identifier 동등성 규칙을 제공하지 않으면 source identity에
 Unicode 정규화를 적용하지 않는다. 참고 구현도 전달받은 문자열을 그대로 UTF-8로 인코딩하므로
