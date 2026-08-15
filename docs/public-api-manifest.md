@@ -126,8 +126,8 @@
 | `FIELD_WEFT_MAX_TOTAL_TAGS_V1` | value | `v1` | `MAX_CODEDOC_TAGS` | `MAX_CODEDOC_TAGS` | — |
 | `FIELD_WEFT_MAX_TOTAL_META_ENTRIES_V1` | value | `v1` | `MAX_CODEDOC_META_ENTRIES` | `MAX_CODEDOC_META_ENTRIES` | — |
 | `FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1` | value | `v1` | `MAX_CODEDOC_ANNOTATION_CODEPOINTS` | `MAX_CODEDOC_ANNOTATION_CODEPOINTS` | — |
-| `FIELD_WEFT_RESERVED_IDS` | value | `global` | `RESERVED_FIELDWEFT_IDS` | `RESERVED_FIELDWEFT_IDS` | — |
-| `FIELD_WEFT_RESERVED_META_KEYS` | value | `global` | `RESERVED_FIELDWEFT_META_KEYS` | `RESERVED_FIELDWEFT_META_KEYS` | — |
+| `FIELD_WEFT_RESERVED_IDS` | value | `global` | `RESERVED_FIELDWEFT_IDS` | `RESERVED_FIELDWEFT_IDS` | Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics. |
+| `FIELD_WEFT_RESERVED_META_KEYS` | value | `global` | `RESERVED_FIELDWEFT_META_KEYS` | `RESERVED_FIELDWEFT_META_KEYS` | Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics. |
 | `FIELD_WEFT_RESERVED_META_PREFIX` | value | `global` | `RESERVED_FIELDWEFT_META_PREFIX` | `RESERVED_FIELDWEFT_META_PREFIX` | — |
 | `FieldWeftAnnotationsV1` | type | `v1` | `FieldWeftAnnotations` | `FieldWeftAnnotations` | — |
 | `ValidFieldWeftDocV1` | type | `v1` | `ValidCodeDoc` | `ValidCodeDoc` | — |

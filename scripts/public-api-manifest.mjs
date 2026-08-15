@@ -262,12 +262,22 @@ export const publicApiManifest = [
   ...manualV1Values.map(([name, sourceName]) =>
     api(name, 'value', 'v1', modelSource, [sourceName]),
   ),
-  api('FIELD_WEFT_RESERVED_IDS', 'value', 'global', modelSource, [
-    'RESERVED_FIELDWEFT_IDS',
-  ]),
-  api('FIELD_WEFT_RESERVED_META_KEYS', 'value', 'global', modelSource, [
-    'RESERVED_FIELDWEFT_META_KEYS',
-  ]),
+  api(
+    'FIELD_WEFT_RESERVED_IDS',
+    'value',
+    'global',
+    modelSource,
+    ['RESERVED_FIELDWEFT_IDS'],
+    'Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics.',
+  ),
+  api(
+    'FIELD_WEFT_RESERVED_META_KEYS',
+    'value',
+    'global',
+    modelSource,
+    ['RESERVED_FIELDWEFT_META_KEYS'],
+    'Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics.',
+  ),
   api('FIELD_WEFT_RESERVED_META_PREFIX', 'value', 'global', modelSource, [
     'RESERVED_FIELDWEFT_META_PREFIX',
   ]),

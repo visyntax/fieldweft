@@ -86,18 +86,27 @@ class ImmutableStringSet implements ReadonlySet<string> {
   [Symbol.iterator](): SetIterator<string> {
     return this.#values[Symbol.iterator]()
   }
-
-  get [Symbol.toStringTag](): string {
-    return 'Set'
-  }
 }
 
 Object.freeze(ImmutableStringSet.prototype)
 
-/** Persistent IDs reserve keys that collide with ordinary object prototypes. */
+/**
+ * Immutable read-only view of persistent IDs that collide with ordinary
+ * object prototypes.
+ *
+ * This facade is not a `Set` instance. Use `new Set(FIELD_WEFT_RESERVED_IDS)`
+ * when ordinary mutable or structured-cloneable `Set` semantics are needed.
+ */
 export const FIELD_WEFT_RESERVED_IDS: ReadonlySet<string> =
   new ImmutableStringSet(RESERVED_ID_VALUES)
 
+/**
+ * Immutable read-only view of metadata keys reserved for prototype safety.
+ *
+ * This facade is not a `Set` instance. Use
+ * `new Set(FIELD_WEFT_RESERVED_META_KEYS)` when ordinary mutable or
+ * structured-cloneable `Set` semantics are needed.
+ */
 export const FIELD_WEFT_RESERVED_META_KEYS: ReadonlySet<string> =
   new ImmutableStringSet(RESERVED_META_KEY_VALUES)
 

@@ -557,9 +557,13 @@ function addValidNodeRelation(doc, label) {
     FIELD_WEFT_RESERVED_IDS,
     FIELD_WEFT_RESERVED_META_KEYS,
   ]) {
+    const expected = ['__proto__', 'prototype', 'constructor']
     assert.equal(Object.isFrozen(reserved), true)
-    assert.equal(Object.prototype.toString.call(reserved), '[object Set]')
-    assert.deepEqual([...reserved], ['__proto__', 'prototype', 'constructor'])
+    assert.equal(reserved instanceof Set, false)
+    assert.notEqual(Object.prototype.toString.call(reserved), '[object Set]')
+    assert.deepEqual([...reserved], expected)
+    assert.deepEqual([...new Set(reserved)], expected)
+    assert.deepEqual([...structuredClone(new Set(reserved))], expected)
     assert.throws(() => reserved.delete('__proto__'), TypeError)
     assert.throws(() => reserved.add('ordinary'), TypeError)
     assert.throws(() => reserved.clear(), TypeError)
