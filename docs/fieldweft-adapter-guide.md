@@ -108,6 +108,10 @@ The reference implementation intentionally fixes only these minimal rules:
   between distinct source tuples. The caller must register source tuples and
   resulting IDs within each ID space. If distinct tuples produce the same ID,
   fail explicitly instead of appending an arbitrary suffix.
+- `objectKind` must be an unreserved FieldWeft ID segment of at most 239 ASCII
+  characters. The `_` separator and 16-character suffix then keep the complete
+  ID within the 256-character v1 limit. The helper rejects a longer prefix
+  rather than truncating it.
 
 If the source system does not define identifier equivalence, do not apply
 Unicode normalization to source identity. The reference implementation encodes

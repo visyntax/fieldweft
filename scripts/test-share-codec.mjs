@@ -6,6 +6,11 @@ import { deflateSync } from 'node:zlib'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const {
+  FIELD_WEFT_BOUNDARY_COLORS_V1,
+  FIELD_WEFT_BOUNDARY_KINDS_V1,
+  FIELD_WEFT_ENTITY_KINDS_V1,
+  FIELD_WEFT_FIELD_TYPES_V1,
+  FIELD_WEFT_MAPPING_KINDS_V1,
   FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1,
   FIELD_WEFT_MAX_DESCRIPTION_CHARS_V1,
   FIELD_WEFT_MAX_FIELD_DEPTH_V1,
@@ -115,6 +120,28 @@ function tokenFromJson(value) {
     plain(richDocument),
   )
   assert.deepEqual(richPacked, richPackedBefore)
+}
+
+// Attempted public vocabulary mutation cannot change d1 enum indexes.
+{
+  const document = canonical(richGolden.document)
+  const packedBefore = packFieldWeftShareDocV1(document)
+  for (const vocabulary of [
+    FIELD_WEFT_BOUNDARY_COLORS_V1,
+    FIELD_WEFT_BOUNDARY_KINDS_V1,
+    FIELD_WEFT_ENTITY_KINDS_V1,
+    FIELD_WEFT_FIELD_TYPES_V1,
+    FIELD_WEFT_MAPPING_KINDS_V1,
+  ]) {
+    assert.equal(Object.isFrozen(vocabulary), true)
+    assert.throws(() => vocabulary.push('mutated'), TypeError)
+    assert.throws(() => vocabulary.splice(0, 1), TypeError)
+  }
+  assert.deepEqual(packFieldWeftShareDocV1(document), packedBefore)
+  assert.deepEqual(
+    plain(canonical(unpackFieldWeftShareDocV1(packedBefore))),
+    plain(document),
+  )
 }
 
 // Empty optional slots and strict tuple errors keep their wire-level contracts.

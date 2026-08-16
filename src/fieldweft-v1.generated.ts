@@ -3,11 +3,11 @@
 
 export const FIELD_WEFT_FORMAT = "fieldweft" as const
 export const FIELD_WEFT_VERSION_V1 = 1 as const
-export const FIELD_WEFT_FIELD_TYPES_V1 = ["uuid","string","number","boolean","timestamp","object","json"] as const
-export const FIELD_WEFT_ENTITY_KINDS_V1 = ["event","api","db","other"] as const
-export const FIELD_WEFT_BOUNDARY_COLORS_V1 = ["blue","green","purple","rose","slate"] as const
-export const FIELD_WEFT_BOUNDARY_KINDS_V1 = ["domain","system","external","security","other"] as const
-export const FIELD_WEFT_MAPPING_KINDS_V1 = ["keep","transform"] as const
+export const FIELD_WEFT_FIELD_TYPES_V1 = Object.freeze(["uuid","string","number","boolean","timestamp","object","json"] as const)
+export const FIELD_WEFT_ENTITY_KINDS_V1 = Object.freeze(["event","api","db","other"] as const)
+export const FIELD_WEFT_BOUNDARY_COLORS_V1 = Object.freeze(["blue","green","purple","rose","slate"] as const)
+export const FIELD_WEFT_BOUNDARY_KINDS_V1 = Object.freeze(["domain","system","external","security","other"] as const)
+export const FIELD_WEFT_MAPPING_KINDS_V1 = Object.freeze(["keep","transform"] as const)
 export const FIELD_WEFT_MAX_ID_CHARS_V1 = 256 as const
 export const FIELD_WEFT_MAX_NAME_CHARS_V1 = 256 as const
 export const FIELD_WEFT_MAX_LABEL_CHARS_V1 = 512 as const

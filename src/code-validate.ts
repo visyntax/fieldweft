@@ -1,6 +1,6 @@
-import { BOUNDARY_KIND_VALUES } from './boundary-kind.js'
 import {
-  FIELD_WEFT_BOUNDARY_COLORS_V1 as BOUNDARY_COLOR_VALUES,
+  FIELD_WEFT_BOUNDARY_COLORS_V1,
+  FIELD_WEFT_BOUNDARY_KINDS_V1,
   FIELD_WEFT_ENTITY_KINDS_V1,
   FIELD_WEFT_FIELD_TYPES_V1,
   FIELD_WEFT_FORMAT,
@@ -28,11 +28,15 @@ import {
   FIELD_WEFT_MAX_RELATIONS_V1,
   FIELD_WEFT_MAX_TOTAL_TAGS_V1,
   FIELD_WEFT_MAX_COORD_V1,
-  FIELD_WEFT_RESERVED_IDS,
-  FIELD_WEFT_RESERVED_META_KEYS,
   FIELD_WEFT_RESERVED_META_PREFIX,
+  isReservedFieldWeftId,
+  isReservedFieldWeftMetaKey,
   type ValidFieldWeftDocV1,
 } from './code-model.js'
+import {
+  getOwnEnumerableProperty,
+  hasOwnEnumerableProperty,
+} from './code-property.js'
 
 export type FieldWeftDiagnosticRelated = {
   path: string
@@ -129,6 +133,15 @@ type ValidationState = {
 }
 
 const ID_RE = /^[A-Za-z0-9_-]+$/
+const BOUNDARY_COLOR_VALUES = Object.freeze([
+  ...FIELD_WEFT_BOUNDARY_COLORS_V1,
+])
+const BOUNDARY_KIND_VALUES = Object.freeze([
+  ...FIELD_WEFT_BOUNDARY_KINDS_V1,
+])
+const ENTITY_KIND_VALUES = Object.freeze([...FIELD_WEFT_ENTITY_KINDS_V1])
+const FIELD_TYPE_VALUES = Object.freeze([...FIELD_WEFT_FIELD_TYPES_V1])
+const MAPPING_KIND_VALUES = Object.freeze([...FIELD_WEFT_MAPPING_KINDS_V1])
 
 function exceedsCodePointLimit(value: string, limit: number): boolean {
   let length = 0
@@ -244,7 +257,11 @@ function isPlainRecord(value: unknown): value is RecordValue {
 }
 
 function hasOwn(value: RecordValue, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key)
+  return hasOwnEnumerableProperty(value, key)
+}
+
+function ownValue(value: RecordValue, key: string): unknown {
+  return getOwnEnumerableProperty(value, key)
 }
 
 function pointerToken(value: string): string {
@@ -318,7 +335,7 @@ function requiredName(
 ): string | undefined {
   const key = 'name'
   const keyPath = childPath(path, key)
-  const raw = value[key]
+  const raw = ownValue(value, key)
   if (typeof raw !== 'string') {
     addError(state, 'type.string', keyPath, 'Expected a string.')
     return undefined
@@ -533,7 +550,7 @@ function validateAnnotations(
         FIELD_WEFT_MAX_META_KEY_CHARS_V1,
         'limit.string.meta-key',
       )
-      if (FIELD_WEFT_RESERVED_META_KEYS.has(key)) {
+      if (isReservedFieldWeftMetaKey(key)) {
         addError(
           state,
           'meta.key-reserved',
@@ -634,7 +651,7 @@ function checkId(
     )
     return undefined
   }
-  if (rejectReserved && FIELD_WEFT_RESERVED_IDS.has(value)) {
+  if (rejectReserved && isReservedFieldWeftId(value)) {
     addError(state, 'id.reserved', path, `ID "${value}" is reserved.`, {
       id: value,
     })
@@ -947,7 +964,7 @@ function validateFields(
     checkKnownKeys(raw, FIELD_KEYS, fieldPath, state)
 
     const idPath = childPath(fieldPath, 'id')
-    const id = checkId(raw.id, idPath, state, true)
+    const id = checkId(ownValue(raw, 'id'), idPath, state, true)
     const isUniqueId = id
       ? registerUnique(state.fieldIds, id, idPath, state, 'id.duplicate-field')
       : false
@@ -979,8 +996,8 @@ function validateFields(
     }
 
     const fieldType = checkEnum(
-      raw.type,
-      FIELD_WEFT_FIELD_TYPES_V1,
+      ownValue(raw, 'type'),
+      FIELD_TYPE_VALUES,
       childPath(fieldPath, 'type'),
       state,
     )
@@ -1075,7 +1092,7 @@ function validateNodeIdentity(
   state: ValidationState,
 ): string {
   const idPath = childPath(path, 'id')
-  const id = checkId(raw.id, idPath, state, true)
+  const id = checkId(ownValue(raw, 'id'), idPath, state, true)
   if (id && registerUnique(state.nodeIds, id, idPath, state, 'id.duplicate-node')) {
     state.nodes.set(id, { kind, path: idPath })
     return id
@@ -1091,7 +1108,7 @@ function validateEntity(raw: unknown, path: string, state: ValidationState): voi
   checkKnownKeys(raw, ENTITY_KEYS, path, state)
   const ownerId = validateNodeIdentity(raw, path, 'entity', state)
   requiredName(raw, path, state)
-  checkEnum(raw.kind, FIELD_WEFT_ENTITY_KINDS_V1, childPath(path, 'kind'), state)
+  checkEnum(ownValue(raw, 'kind'), ENTITY_KIND_VALUES, childPath(path, 'kind'), state)
   validateAnnotations(raw, path, state)
   if (hasOwn(raw, 'position')) checkCoordinate(raw.position, childPath(path, 'position'), state)
 
@@ -1125,7 +1142,7 @@ function validateProcess(raw: unknown, path: string, state: ValidationState): vo
   checkKnownKeys(raw, PROCESS_KEYS, path, state)
   const ownerId = validateNodeIdentity(raw, path, 'process', state)
   requiredName(raw, path, state)
-  checkEnum(raw.kind, FIELD_WEFT_ENTITY_KINDS_V1, childPath(path, 'kind'), state)
+  checkEnum(ownValue(raw, 'kind'), ENTITY_KIND_VALUES, childPath(path, 'kind'), state)
   validateAnnotations(raw, path, state)
   if (hasOwn(raw, 'position')) checkCoordinate(raw.position, childPath(path, 'position'), state)
 
@@ -1196,7 +1213,7 @@ function validateMapping(raw: unknown, path: string, state: ValidationState): vo
   }
   checkKnownKeys(raw, MAPPING_KEYS, path, state)
   const idPath = childPath(path, 'id')
-  const id = checkId(raw.id, idPath, state, true)
+  const id = checkId(ownValue(raw, 'id'), idPath, state, true)
   if (id) {
     registerUnique(
       state.relationIds,
@@ -1208,19 +1225,19 @@ function validateMapping(raw: unknown, path: string, state: ValidationState): vo
   }
 
   const sourceFieldId = checkId(
-    raw.sourceFieldId,
+    ownValue(raw, 'sourceFieldId'),
     childPath(path, 'sourceFieldId'),
     state,
     true,
   )
   const targetFieldId = checkId(
-    raw.targetFieldId,
+    ownValue(raw, 'targetFieldId'),
     childPath(path, 'targetFieldId'),
     state,
     true,
   )
   if (hasOwn(raw, 'kind')) {
-    checkEnum(raw.kind, FIELD_WEFT_MAPPING_KINDS_V1, childPath(path, 'kind'), state)
+    checkEnum(raw.kind, MAPPING_KIND_VALUES, childPath(path, 'kind'), state)
   }
   optionalString(
     raw,
@@ -1249,7 +1266,7 @@ function validateNodeRelation(
   }
   checkKnownKeys(raw, NODE_RELATION_KEYS, path, state)
   const idPath = childPath(path, 'id')
-  const id = checkId(raw.id, idPath, state, true)
+  const id = checkId(ownValue(raw, 'id'), idPath, state, true)
   if (id) {
     registerUnique(
       state.relationIds,
@@ -1260,13 +1277,13 @@ function validateNodeRelation(
     )
   }
   const sourceNodeId = checkId(
-    raw.sourceNodeId,
+    ownValue(raw, 'sourceNodeId'),
     childPath(path, 'sourceNodeId'),
     state,
     true,
   )
   const targetNodeId = checkId(
-    raw.targetNodeId,
+    ownValue(raw, 'targetNodeId'),
     childPath(path, 'targetNodeId'),
     state,
     true,
@@ -1298,7 +1315,7 @@ function validateNodeRelation(
 function validateWhenReferences(state: ValidationState): void {
   for (const ref of state.whenRefs) {
     for (const [discriminatorId, rawValues] of Object.entries(ref.when)) {
-      if (!ID_RE.test(discriminatorId) || FIELD_WEFT_RESERVED_IDS.has(discriminatorId)) continue
+      if (!ID_RE.test(discriminatorId) || isReservedFieldWeftId(discriminatorId)) continue
       const path = childPath(ref.path, discriminatorId)
       if (ref.fieldId === discriminatorId) {
         addError(
@@ -1633,6 +1650,8 @@ export function validateFieldWeftDocV1(input: unknown): ValidateFieldWeftDocResu
 export function readFieldWeftDoc(input: unknown): ReadFieldWeftDocResult {
   if (
     isRecord(input) &&
+    hasOwn(input, 'format') &&
+    hasOwn(input, 'version') &&
     input.format === FIELD_WEFT_FORMAT &&
     Number.isInteger(input.version) &&
     input.version !== FIELD_WEFT_VERSION_V1

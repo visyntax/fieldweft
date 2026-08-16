@@ -262,12 +262,22 @@ export const publicApiManifest = [
   ...manualV1Values.map(([name, sourceName]) =>
     api(name, 'value', 'v1', modelSource, [sourceName]),
   ),
-  api('FIELD_WEFT_RESERVED_IDS', 'value', 'global', modelSource, [
-    'RESERVED_FIELDWEFT_IDS',
-  ]),
-  api('FIELD_WEFT_RESERVED_META_KEYS', 'value', 'global', modelSource, [
-    'RESERVED_FIELDWEFT_META_KEYS',
-  ]),
+  api(
+    'FIELD_WEFT_RESERVED_IDS',
+    'value',
+    'global',
+    modelSource,
+    ['RESERVED_FIELDWEFT_IDS'],
+    'Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics.',
+  ),
+  api(
+    'FIELD_WEFT_RESERVED_META_KEYS',
+    'value',
+    'global',
+    modelSource,
+    ['RESERVED_FIELDWEFT_META_KEYS'],
+    'Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics.',
+  ),
   api('FIELD_WEFT_RESERVED_META_PREFIX', 'value', 'global', modelSource, [
     'RESERVED_FIELDWEFT_META_PREFIX',
   ]),
@@ -523,6 +533,30 @@ export const publicApiManifest = [
 ]
 
 export const excludedApiSymbols = [
+  {
+    name: 'isReservedFieldWeftId',
+    source: 'src/code-model.ts',
+    disposition: 'internal',
+    reason: 'Validator lookup isolation is an implementation detail, not a package API.',
+  },
+  {
+    name: 'isReservedFieldWeftMetaKey',
+    source: 'src/code-model.ts',
+    disposition: 'internal',
+    reason: 'Validator lookup isolation is an implementation detail, not a package API.',
+  },
+  {
+    name: 'hasOwnEnumerableProperty',
+    source: 'src/code-property.ts',
+    disposition: 'internal',
+    reason: 'Schema-property presence checks are shared package-internal implementation.',
+  },
+  {
+    name: 'getOwnEnumerableProperty',
+    source: 'src/code-property.ts',
+    disposition: 'internal',
+    reason: 'Schema-property reads are shared package-internal implementation.',
+  },
   {
     name: 'deterministicAdapterId',
     source: 'src/adapter-reference.ts',

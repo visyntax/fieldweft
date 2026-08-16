@@ -10,8 +10,8 @@
 ## Decisions represented by this manifest
 
 - The root entry point exports only the symbols listed in this document.
-- Schema-derived vocabulary types, enum arrays, and limits use generated
-  `FieldWeft*V1` and `FIELD_WEFT_*_V1` names.
+- Schema-derived vocabulary types, frozen enum arrays, and limits use
+  generated `FieldWeft*V1` and `FIELD_WEFT_*_V1` names.
 - Limits paired with document-wide totals state `PER_OBJECT` explicitly in
   their object-local names.
 - `FieldWeftId`, reserved identifiers, diagnostics, and field-ID helpers are
@@ -126,8 +126,8 @@
 | `FIELD_WEFT_MAX_TOTAL_TAGS_V1` | value | `v1` | `MAX_CODEDOC_TAGS` | `MAX_CODEDOC_TAGS` | — |
 | `FIELD_WEFT_MAX_TOTAL_META_ENTRIES_V1` | value | `v1` | `MAX_CODEDOC_META_ENTRIES` | `MAX_CODEDOC_META_ENTRIES` | — |
 | `FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1` | value | `v1` | `MAX_CODEDOC_ANNOTATION_CODEPOINTS` | `MAX_CODEDOC_ANNOTATION_CODEPOINTS` | — |
-| `FIELD_WEFT_RESERVED_IDS` | value | `global` | `RESERVED_FIELDWEFT_IDS` | `RESERVED_FIELDWEFT_IDS` | — |
-| `FIELD_WEFT_RESERVED_META_KEYS` | value | `global` | `RESERVED_FIELDWEFT_META_KEYS` | `RESERVED_FIELDWEFT_META_KEYS` | — |
+| `FIELD_WEFT_RESERVED_IDS` | value | `global` | `RESERVED_FIELDWEFT_IDS` | `RESERVED_FIELDWEFT_IDS` | Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics. |
+| `FIELD_WEFT_RESERVED_META_KEYS` | value | `global` | `RESERVED_FIELDWEFT_META_KEYS` | `RESERVED_FIELDWEFT_META_KEYS` | Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics. |
 | `FIELD_WEFT_RESERVED_META_PREFIX` | value | `global` | `RESERVED_FIELDWEFT_META_PREFIX` | `RESERVED_FIELDWEFT_META_PREFIX` | — |
 | `FieldWeftAnnotationsV1` | type | `v1` | `FieldWeftAnnotations` | `FieldWeftAnnotations` | — |
 | `ValidFieldWeftDocV1` | type | `v1` | `ValidCodeDoc` | `ValidCodeDoc` | — |
@@ -255,6 +255,10 @@ The first `fieldweft-web` release MUST NOT retain superseded v1 aliases for thes
 
 | Current name | Source | Disposition | Reason |
 |---|---|---|---|
+| `isReservedFieldWeftId` | `src/code-model.ts` | `internal` | Validator lookup isolation is an implementation detail, not a package API. |
+| `isReservedFieldWeftMetaKey` | `src/code-model.ts` | `internal` | Validator lookup isolation is an implementation detail, not a package API. |
+| `hasOwnEnumerableProperty` | `src/code-property.ts` | `internal` | Schema-property presence checks are shared package-internal implementation. |
+| `getOwnEnumerableProperty` | `src/code-property.ts` | `internal` | Schema-property reads are shared package-internal implementation. |
 | `deterministicAdapterId` | `src/adapter-reference.ts` | `repository-reference` | The packaged adapter source is copied by consumers, not imported as a package API. |
 | `BOUNDARY_KIND_VALUES` | `src/boundary-kind.ts` | `generated-replacement` | Use FIELD_WEFT_BOUNDARY_KINDS_V1 from generated output. |
 | `BoundaryKind` | `src/boundary-kind.ts` | `generated-replacement` | Use FieldWeftBoundaryKindV1 from generated output. |
