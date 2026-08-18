@@ -50,6 +50,22 @@ non-enumerable optional property is absent. Non-metadata schema objects may
 have custom prototypes when their schema properties follow this rule.
 Metadata maps retain the stricter plain-object or null-prototype requirement.
 
+Structured-input validation accepts JSON-visible values only through own data
+properties. An own enumerable object accessor, an accessor-backed array
+element, or a sparse array is rejected without invoking the accessor. This
+policy applies at every level, including top-level markers, schema objects,
+array elements, metadata entries, and `when` entries. These failures use the
+`input.unstable` diagnostic code with no `params`. Values produced by
+`JSON.parse` already satisfy this rule.
+
+Proxy-backed objects and arrays are outside the supported structured-input
+contract because JavaScript does not provide reliable Proxy detection.
+Descriptor-inspection or property-read trap failures are converted to
+`input.unstable` instead of escaping a public validation or read boundary, but
+no trap-count or diagnostic-order guarantee is made for a non-throwing hostile
+Proxy. Callers must first materialize Proxy-backed data as ordinary data
+properties and dense arrays.
+
 For preservation and editing by people or AI, see the
 [authoring and editing guide](fieldweft-authoring-guide.md). For projection
 from external models, see the [adapter guide](fieldweft-adapter-guide.md). For
@@ -323,6 +339,14 @@ are deterministically ordered: `tags`, metadata keys, `when` keys and values,
 order, not locale order. Discriminator values preserve author order because
 that order is display-significant. User order is also preserved for entities,
 processes, boundaries, node relations, mappings, and sibling field arrays.
+
+`readCanonicalFieldWeftDoc` validates the materialized canonical document
+again before returning `ok`. Therefore every successful result satisfies
+`validateFieldWeftDocV1(result.doc).ok === true`, including all structural,
+reference, aggregate, and canonical-byte limits. This post-canonical check is
+defense in depth; the accessor rejection above is what prevents ordinary
+structured input from being observed inconsistently during validation and
+canonicalization.
 
 Exports, code editors, and documents embedded in backups must use the
 FieldWeft serializer whenever canonical JSON bytes matter. The serializer

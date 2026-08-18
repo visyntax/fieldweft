@@ -272,6 +272,96 @@ function childPath(path: string, key: string | number): string {
   return `${path}/${pointerToken(String(key))}`
 }
 
+type UnstableStructuredInput = {
+  path: string
+}
+
+function isArrayIndexKey(key: string, length: number): boolean {
+  const index = Number(key)
+  return (
+    Number.isInteger(index) &&
+    index >= 0 &&
+    index < length &&
+    String(index) === key
+  )
+}
+
+/**
+ * Rejects JSON-visible accessors without invoking them. Sparse arrays are also
+ * rejected so inherited indexed properties cannot participate in validation.
+ */
+function findUnstableStructuredInput(
+  input: unknown,
+): UnstableStructuredInput | undefined {
+  const pending: Array<{ value: unknown; path: string }> = [
+    { value: input, path: '' },
+  ]
+  const seen = new WeakSet<object>()
+
+  while (pending.length) {
+    const current = pending.pop() as { value: unknown; path: string }
+    if (
+      (typeof current.value !== 'object' && typeof current.value !== 'function') ||
+      current.value === null ||
+      seen.has(current.value)
+    ) {
+      continue
+    }
+    seen.add(current.value)
+
+    try {
+      const array = Array.isArray(current.value)
+      let arrayLength = 0
+      if (array) {
+        const lengthDescriptor = Reflect.getOwnPropertyDescriptor(
+          current.value,
+          'length',
+        )
+        if (!lengthDescriptor || !('value' in lengthDescriptor)) return current
+        arrayLength = lengthDescriptor.value as number
+      }
+
+      let arrayElementCount = 0
+      for (const key of Reflect.ownKeys(current.value)) {
+        const descriptor = Reflect.getOwnPropertyDescriptor(current.value, key)
+        const keyPath =
+          typeof key === 'string' ? childPath(current.path, key) : current.path
+        if (!descriptor) return { path: keyPath }
+
+        const arrayElement =
+          array &&
+          typeof key === 'string' &&
+          isArrayIndexKey(key, arrayLength)
+        const jsonVisibleObjectProperty =
+          !array && typeof key === 'string' && descriptor.enumerable
+        if (!arrayElement && !jsonVisibleObjectProperty) continue
+
+        if (!('value' in descriptor)) return { path: keyPath }
+        if (arrayElement) arrayElementCount++
+        pending.push({ value: descriptor.value, path: keyPath })
+      }
+
+      if (array && arrayElementCount !== arrayLength) return current
+    } catch {
+      return current
+    }
+  }
+
+  return undefined
+}
+
+function unstableStructuredInputDiagnostic(
+  path: string,
+): FieldWeftDiagnostic {
+  return {
+    code: 'input.unstable',
+    path,
+    severity: 'error',
+    message:
+      'Structured input must use stable own data properties and dense arrays.',
+  }
+}
+
 function addError(
   state: ValidationState,
   code: string,
@@ -1555,7 +1645,9 @@ function validateNodes(
   }
 }
 
-export function validateFieldWeftDocV1(input: unknown): ValidateFieldWeftDocResultV1 {
+function validateStableFieldWeftDocV1(
+  input: unknown,
+): ValidateFieldWeftDocResultV1 {
   const state = createState()
   if (!isRecord(input)) {
     addError(state, 'type.object', '', 'The top-level FieldWeft value must be an object.')
@@ -1647,19 +1739,54 @@ export function validateFieldWeftDocV1(input: unknown): ValidateFieldWeftDocResu
   return { ok: true, doc: input as ValidFieldWeftDocV1 }
 }
 
-export function readFieldWeftDoc(input: unknown): ReadFieldWeftDocResult {
-  if (
-    isRecord(input) &&
-    hasOwn(input, 'format') &&
-    hasOwn(input, 'version') &&
-    input.format === FIELD_WEFT_FORMAT &&
-    Number.isInteger(input.version) &&
-    input.version !== FIELD_WEFT_VERSION_V1
-  ) {
-    return { kind: 'unsupported', version: input.version }
+export function validateFieldWeftDocV1(
+  input: unknown,
+): ValidateFieldWeftDocResultV1 {
+  const unstable = findUnstableStructuredInput(input)
+  if (unstable) {
+    return {
+      ok: false,
+      errors: [unstableStructuredInputDiagnostic(unstable.path)],
+    }
   }
-  const result = validateFieldWeftDocV1(input)
-  return result.ok
-    ? { kind: 'ok', doc: result.doc }
-    : { kind: 'invalid', errors: result.errors }
+  try {
+    return validateStableFieldWeftDocV1(input)
+  } catch {
+    return {
+      ok: false,
+      errors: [unstableStructuredInputDiagnostic('')],
+    }
+  }
+}
+
+export function readFieldWeftDoc(input: unknown): ReadFieldWeftDocResult {
+  const unstable = findUnstableStructuredInput(input)
+  if (unstable) {
+    return {
+      kind: 'invalid',
+      errors: [unstableStructuredInputDiagnostic(unstable.path)],
+    }
+  }
+  try {
+    if (isRecord(input)) {
+      const format = ownValue(input, 'format')
+      const version = ownValue(input, 'version')
+      if (
+        format === FIELD_WEFT_FORMAT &&
+        Number.isInteger(version) &&
+        version !== FIELD_WEFT_VERSION_V1
+      ) {
+        return { kind: 'unsupported', version }
+      }
+    }
+    const result = validateStableFieldWeftDocV1(input)
+    return result.ok
+      ? { kind: 'ok', doc: result.doc }
+      : { kind: 'invalid', errors: result.errors }
+  } catch {
+    return {
+      kind: 'invalid',
+      errors: [unstableStructuredInputDiagnostic('')],
+    }
+  }
 }

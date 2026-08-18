@@ -205,6 +205,21 @@ function tokenFromJson(value) {
     id: duplicate.entities[0].fields[0].id,
   })
 
+  const accessorBacked = structuredClone(canonicalInput)
+  let accessorReads = 0
+  Object.defineProperty(accessorBacked.entities[0], 'id', {
+    enumerable: true,
+    get() {
+      accessorReads++
+      return accessorReads === 1 ? 'entity' : '!'.repeat(500)
+    },
+  })
+  const unstable = await encodeFieldWeftShare(accessorBacked)
+  assert.equal(unstable.kind, 'invalid')
+  assert.equal(unstable.diagnostics[0].code, 'input.unstable')
+  assert.equal(unstable.diagnostics[0].path, '/entities/0/id')
+  assert.equal(accessorReads, 0)
+
   const oversizedDescription = structuredClone(golden.document)
   oversizedDescription.entities[0].description = 'x'.repeat(
     FIELD_WEFT_MAX_DESCRIPTION_CHARS_V1 + 1,

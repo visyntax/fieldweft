@@ -7,6 +7,7 @@ import {
 import { canonicalFieldWeftDocUtf8Bytes } from './code-serialize.js'
 import {
   readFieldWeftDoc,
+  validateFieldWeftDocV1,
   type FieldWeftDiagnostic,
 } from './code-validate.js'
 
@@ -25,29 +26,47 @@ function unsupportedVersionDiagnostic(version: unknown): FieldWeftDiagnostic {
   }
 }
 
+function unstableInputDiagnostic(): FieldWeftDiagnostic {
+  return {
+    code: 'input.unstable',
+    path: '',
+    severity: 'error',
+    message:
+      'Structured input must use stable own data properties and dense arrays.',
+  }
+}
+
 /** Shared unknown → validate → canonicalize pipeline for external input boundaries. */
 export function readCanonicalFieldWeftDoc(
   input: unknown,
 ): ReadCanonicalFieldWeftDocResult {
   const result = readFieldWeftDoc(input)
   if (result.kind === 'ok') {
-    const doc = canonicalizeFieldWeftDoc(result.doc)
-    const bytes = canonicalFieldWeftDocUtf8Bytes(doc)
-    if (bytes > FIELD_WEFT_MAX_CANONICAL_BYTES_V1) {
-      return {
-        ok: false,
-        errors: [
-          {
-            code: 'limit.canonical-bytes',
-            path: '',
-            severity: 'error',
-            message: `Compact canonical JSON must not exceed ${FIELD_WEFT_MAX_CANONICAL_BYTES_V1} UTF-8 bytes.`,
-            params: { limit: FIELD_WEFT_MAX_CANONICAL_BYTES_V1 },
-          },
-        ],
+    try {
+      const doc = canonicalizeFieldWeftDoc(result.doc)
+      const canonicalValidation = validateFieldWeftDocV1(doc)
+      if (!canonicalValidation.ok) {
+        return { ok: false, errors: canonicalValidation.errors }
       }
+      const bytes = canonicalFieldWeftDocUtf8Bytes(doc)
+      if (bytes > FIELD_WEFT_MAX_CANONICAL_BYTES_V1) {
+        return {
+          ok: false,
+          errors: [
+            {
+              code: 'limit.canonical-bytes',
+              path: '',
+              severity: 'error',
+              message: `Compact canonical JSON must not exceed ${FIELD_WEFT_MAX_CANONICAL_BYTES_V1} UTF-8 bytes.`,
+              params: { limit: FIELD_WEFT_MAX_CANONICAL_BYTES_V1 },
+            },
+          ],
+        }
+      }
+      return { ok: true, doc }
+    } catch {
+      return { ok: false, errors: [unstableInputDiagnostic()] }
     }
-    return { ok: true, doc }
   }
   if (result.kind === 'unsupported') {
     return { ok: false, errors: [unsupportedVersionDiagnostic(result.version)] }

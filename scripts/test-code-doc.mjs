@@ -483,7 +483,12 @@ function addValidNodeRelation(doc, label) {
 {
   const customPrototype = makeValidDoc()
   customPrototype.entities[0] = Object.assign(
-    Object.create({ inheritedUnknown: true }),
+    Object.create({
+      inheritedUnknown: true,
+      get inheritedAccessor() {
+        throw new Error('inherited accessors must remain unobserved')
+      },
+    }),
     customPrototype.entities[0],
   )
   assert.equal(validateFieldWeftDocV1(customPrototype).ok, true)
@@ -499,6 +504,109 @@ function addValidNodeRelation(doc, label) {
 
   const parsed = JSON.parse(JSON.stringify(makeValidDoc()))
   assert.equal(validateFieldWeftDocV1(parsed).ok, true)
+}
+
+// Structured-input accessors and sparse arrays are rejected without observation.
+{
+  const accessorCases = [
+    ['top-level version', (doc) => [doc, 'version', '/version']],
+    [
+      'nested required property',
+      (doc) => [doc.entities[0], 'id', '/entities/0/id'],
+    ],
+    [
+      'optional nested property',
+      (doc) => [doc.entities[0], 'position', '/entities/0/position'],
+    ],
+    ['array element', (doc) => [doc.entities, '0', '/entities/0']],
+    [
+      'metadata entry',
+      (doc) => {
+        doc.entities[0].meta = { owner: 'payments' }
+        return [doc.entities[0].meta, 'owner', '/entities/0/meta/owner']
+      },
+    ],
+    [
+      'when entry',
+      (doc) => [
+        doc.entities[0].fields[4].when,
+        'status_f',
+        '/entities/0/fields/4/when/status_f',
+      ],
+    ],
+    [
+      'when array element',
+      (doc) => [
+        doc.entities[0].fields[4].when.status_f,
+        '0',
+        '/entities/0/fields/4/when/status_f/0',
+      ],
+    ],
+  ]
+
+  for (const [name, locate] of accessorCases) {
+    const doc = makeValidDoc()
+    const [owner, key, path] = locate(doc)
+    const original = owner[key]
+    let reads = 0
+    Object.defineProperty(owner, key, {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads++
+        if (name === 'top-level version') throw new Error('boom')
+        return original
+      },
+    })
+
+    const validated = validateFieldWeftDocV1(doc)
+    assert.equal(validated.ok, false, `${name} must be rejected by validation`)
+    assert.equal(errorWithCode(validated, 'input.unstable').path, path)
+
+    const canonical = readCanonicalFieldWeftDoc(doc)
+    assert.equal(canonical.ok, false, `${name} must be rejected by canonical read`)
+    assert.equal(errorWithCode(canonical, 'input.unstable').path, path)
+    assert.equal(reads, 0, `${name} getter must not be invoked`)
+  }
+
+  const sparse = makeValidDoc()
+  sparse.entities = new Array(1)
+  const sparseResult = validateFieldWeftDocV1(sparse)
+  assert.equal(errorWithCode(sparseResult, 'input.unstable').path, '/entities')
+}
+
+// Proxy trap failures are absorbed, and post-canonical validation prevents an
+// unstable proxy read from producing an invalid successful result.
+{
+  const throwingProxy = new Proxy(makeValidDoc(), {
+    ownKeys() {
+      throw new Error('boom')
+    },
+  })
+  assert.equal(
+    errorWithCode(validateFieldWeftDocV1(throwingProxy), 'input.unstable').path,
+    '',
+  )
+  assert.equal(
+    errorWithCode(readCanonicalFieldWeftDoc(throwingProxy), 'input.unstable')
+      .path,
+    '',
+  )
+
+  const changing = makeValidDoc()
+  let idReads = 0
+  changing.entities[0] = new Proxy(changing.entities[0], {
+    get(target, key, receiver) {
+      if (key === 'id') {
+        idReads++
+        return idReads === 1 ? 'order' : '!'.repeat(500)
+      }
+      return Reflect.get(target, key, receiver)
+    },
+  })
+  const result = readCanonicalFieldWeftDoc(changing)
+  assert.equal(result.ok, false)
+  assert.ok(result.errors.some((error) => error.path === '/entities/0/id'))
 }
 
 // schema와 TypeScript validator는 공통 구조 fixture에서 같은 판정을 낸다.
@@ -828,7 +936,9 @@ function addValidNodeRelation(doc, label) {
   errorWithCode(validateFieldWeftDocV1(deep), 'limit.field-depth')
 
   const tooMany = makeValidDoc()
-  tooMany.entities[0].fields = new Array(FIELD_WEFT_MAX_FIELDS_V1 + 1)
+  tooMany.entities[0].fields = new Array(FIELD_WEFT_MAX_FIELDS_V1 + 1).fill(
+    null,
+  )
   tooMany.entities[0].collapsed = []
   tooMany.mappings = []
   errorWithCode(validateFieldWeftDocV1(tooMany), 'limit.fields')

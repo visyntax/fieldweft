@@ -41,6 +41,18 @@ non-enumerable인 required property는 누락으로, optional property는 부재
 아닌 schema 객체는 이 property 규칙을 지키면 custom prototype을 가질 수 있다. metadata map은
 기존의 더 엄격한 plain object 또는 null prototype 조건을 유지한다.
 
+구조화 입력 검증은 JSON에 보이는 값을 own data property를 통해서만 받는다. own enumerable object
+accessor, accessor 기반 배열 요소, sparse array는 accessor를 실행하지 않고 거부한다. 이 정책은
+top-level marker, schema 객체, 배열 요소, metadata entry, `when` entry를 포함한 모든 단계에
+적용한다. 이 실패에는 `params`가 없는 `input.unstable` diagnostic code를 사용한다. `JSON.parse`가
+만든 값은 이미 이 규칙을 만족한다.
+
+JavaScript는 Proxy를 신뢰성 있게 감지하는 방법을 제공하지 않으므로 Proxy 기반 객체와 배열은 지원
+대상인 구조화 입력 계약 밖이다. descriptor inspection이나 property read trap이 실패하면 공개 검증·
+읽기 경계 밖으로 예외를 던지는 대신 `input.unstable`로 변환하지만, 예외를 던지지 않는 hostile
+Proxy의 trap 실행 횟수나 diagnostic 순서는 보장하지 않는다. 호출자는 Proxy 기반 데이터를 먼저
+일반 data property와 dense array로 구체화해야 한다.
+
 사람·AI가 문서를 보존하며 고치는 방법은 [`작성·수정 가이드`](fieldweft-authoring-guide.md), 외부
 모델 투영은 [`adapter 가이드`](fieldweft-adapter-guide.md), `#g=d1.…` transport는
 [`공유 가이드`](fieldweft-sharing-guide.md)를 따른다.
@@ -272,6 +284,12 @@ false는 생략한다. `tags`, `meta` key, `when` key/value, `collapsed`, bounda
 또는 map 의미인 collection만 결정적 순서로 정리한다. 그 순서는 locale이 아니라 UTF-16 code-unit
 ordinal 순서다. discriminator values는 표시 순서이므로 작성 순서를 보존한다. entity, process,
 boundary, node relation, mapping과 sibling field 배열의 사용자 순서도 정렬하지 않는다.
+
+`readCanonicalFieldWeftDoc`은 `ok`를 반환하기 전에 구체화한 canonical 문서를 다시 검증한다. 따라서
+모든 성공 결과는 구조·참조·전체 자원·canonical byte 제한을 포함해
+`validateFieldWeftDocV1(result.doc).ok === true`를 만족한다. 이 canonical 이후 검사는 defense in
+depth이며, 일반 구조화 입력을 검증과 canonicalization에서 서로 다르게 관찰하지 않게 하는 주된
+정책은 위 accessor 거부다.
 
 canonical JSON byte가 필요한 export·코드 편집기·백업 embedded document는 FieldWeft 전용
 serializer를 사용한다. serializer는 schema property를 위 계약의 고정 순서로 쓰고, 사용자 key map인
