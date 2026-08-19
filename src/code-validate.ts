@@ -276,6 +276,21 @@ type UnstableStructuredInput = {
   path: string
 }
 
+type StructuredMarker =
+  | { kind: 'absent' }
+  | { kind: 'data'; value: unknown }
+  | { kind: 'unstable' }
+
+function inspectOwnEnumerableDataProperty(
+  value: RecordValue,
+  key: string,
+): StructuredMarker {
+  const descriptor = Reflect.getOwnPropertyDescriptor(value, key)
+  if (!descriptor?.enumerable) return { kind: 'absent' }
+  if (!Object.hasOwn(descriptor, 'value')) return { kind: 'unstable' }
+  return { kind: 'data', value: descriptor.value }
+}
+
 function isArrayIndexKey(key: string, length: number): boolean {
   const index = Number(key)
   return (
@@ -301,7 +316,7 @@ function findUnstableStructuredInput(
   while (pending.length) {
     const current = pending.pop() as { value: unknown; path: string }
     if (
-      (typeof current.value !== 'object' && typeof current.value !== 'function') ||
+      typeof current.value !== 'object' ||
       current.value === null ||
       seen.has(current.value)
     ) {
@@ -317,7 +332,9 @@ function findUnstableStructuredInput(
           current.value,
           'length',
         )
-        if (!lengthDescriptor || !('value' in lengthDescriptor)) return current
+        if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, 'value')) {
+          return current
+        }
         arrayLength = lengthDescriptor.value as number
       }
 
@@ -336,7 +353,7 @@ function findUnstableStructuredInput(
           !array && typeof key === 'string' && descriptor.enumerable
         if (!arrayElement && !jsonVisibleObjectProperty) continue
 
-        if (!('value' in descriptor)) return { path: keyPath }
+        if (!Object.hasOwn(descriptor, 'value')) return { path: keyPath }
         if (arrayElement) arrayElementCount++
         pending.push({ value: descriptor.value, path: keyPath })
       }
@@ -872,7 +889,8 @@ function validateStringSet(
   }
   const strings: string[] = []
   const seen = new Map<string, string>()
-  value.forEach((item, index) => {
+  for (let index = 0; index < value.length; index++) {
+    const item = value[index]
     const itemPath = childPath(path, index)
     if (typeof item !== 'string' || item.length === 0) {
       addError(
@@ -881,7 +899,7 @@ function validateStringSet(
         itemPath,
         'Expected a non-empty string.',
       )
-      return
+      continue
     }
     if (
       maxChars != null &&
@@ -893,7 +911,7 @@ function validateStringSet(
         'limit.string.variant-value',
       )
     ) {
-      return
+      continue
     }
     const firstPath = seen.get(item)
     if (firstPath) {
@@ -905,11 +923,11 @@ function validateStringSet(
         { value: item },
         [{ path: itemPath, message: 'Duplicate location.' }],
       )
-      return
+      continue
     }
     seen.set(item, itemPath)
     strings.push(item)
-  })
+  }
   return strings
 }
 
@@ -1212,14 +1230,15 @@ function validateEntity(raw: unknown, path: string, state: ValidationState): voi
     const ids = validateStringSet(raw.collapsed, collapsedPath, state)
     if (ids && Array.isArray(raw.collapsed)) {
       const seen = new Set<string>()
-      raw.collapsed.forEach((fieldId, index) => {
-        if (typeof fieldId !== 'string' || fieldId.length === 0 || seen.has(fieldId)) return
+      for (let index = 0; index < raw.collapsed.length; index++) {
+        const fieldId = raw.collapsed[index]
+        if (typeof fieldId !== 'string' || fieldId.length === 0 || seen.has(fieldId)) continue
         seen.add(fieldId)
         const itemPath = childPath(collapsedPath, index)
         if (checkId(fieldId, itemPath, state, true)) {
           state.collapsedRefs.push({ ownerId, fieldId, path: itemPath })
         }
-      })
+      }
     }
   }
 }
@@ -1284,14 +1303,15 @@ function validateBoundary(raw: unknown, path: string, state: ValidationState): v
     const members = validateStringSet(raw.members, membersPath, state)
     if (members && Array.isArray(raw.members)) {
       const seen = new Set<string>()
-      raw.members.forEach((memberId, index) => {
-        if (typeof memberId !== 'string' || memberId.length === 0 || seen.has(memberId)) return
+      for (let index = 0; index < raw.members.length; index++) {
+        const memberId = raw.members[index]
+        if (typeof memberId !== 'string' || memberId.length === 0 || seen.has(memberId)) continue
         seen.add(memberId)
         const itemPath = childPath(membersPath, index)
         if (checkId(memberId, itemPath, state, true)) {
           state.memberRefs.push({ memberId, path: itemPath })
         }
-      })
+      }
     }
   }
 }
@@ -1447,7 +1467,8 @@ function validateWhenReferences(state: ValidationState): void {
         continue
       }
       if (!Array.isArray(rawValues)) continue
-      rawValues.forEach((value, index) => {
+      for (let index = 0; index < rawValues.length; index++) {
+        const value = rawValues[index]
         if (typeof value === 'string' && !target.discriminatorValues?.includes(value)) {
           addError(
             state,
@@ -1457,7 +1478,7 @@ function validateWhenReferences(state: ValidationState): void {
             { value },
           )
         }
-      })
+      }
     }
   }
 }
@@ -1760,23 +1781,37 @@ export function validateFieldWeftDocV1(
 }
 
 export function readFieldWeftDoc(input: unknown): ReadFieldWeftDocResult {
-  const unstable = findUnstableStructuredInput(input)
-  if (unstable) {
-    return {
-      kind: 'invalid',
-      errors: [unstableStructuredInputDiagnostic(unstable.path)],
-    }
-  }
   try {
     if (isRecord(input)) {
-      const format = ownValue(input, 'format')
-      const version = ownValue(input, 'version')
+      const formatMarker = inspectOwnEnumerableDataProperty(input, 'format')
+      if (formatMarker.kind === 'unstable') {
+        return {
+          kind: 'invalid',
+          errors: [unstableStructuredInputDiagnostic('/format')],
+        }
+      }
+      const versionMarker = inspectOwnEnumerableDataProperty(input, 'version')
+      if (versionMarker.kind === 'unstable') {
+        return {
+          kind: 'invalid',
+          errors: [unstableStructuredInputDiagnostic('/version')],
+        }
+      }
       if (
-        format === FIELD_WEFT_FORMAT &&
-        Number.isInteger(version) &&
-        version !== FIELD_WEFT_VERSION_V1
+        formatMarker.kind === 'data' &&
+        formatMarker.value === FIELD_WEFT_FORMAT &&
+        versionMarker.kind === 'data' &&
+        Number.isInteger(versionMarker.value) &&
+        versionMarker.value !== FIELD_WEFT_VERSION_V1
       ) {
-        return { kind: 'unsupported', version }
+        return { kind: 'unsupported', version: versionMarker.value }
+      }
+    }
+    const unstable = findUnstableStructuredInput(input)
+    if (unstable) {
+      return {
+        kind: 'invalid',
+        errors: [unstableStructuredInputDiagnostic(unstable.path)],
       }
     }
     const result = validateStableFieldWeftDocV1(input)

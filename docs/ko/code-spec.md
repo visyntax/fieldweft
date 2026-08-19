@@ -47,6 +47,19 @@ top-level marker, schema 객체, 배열 요소, metadata entry, `when` entry를 
 적용한다. 이 실패에는 `params`가 없는 `input.unstable` diagnostic code를 사용한다. `JSON.parse`가
 만든 값은 이미 이 규칙을 만족한다.
 
+구조화 입력 거부는 `input.unstable` diagnostic 하나만 보고하고 다른 diagnostic은 보고하지 않는다.
+불안정한 위치가 둘 이상이면 어느 위치가 diagnostic path를 결정하는지는 규정하지 않는다.
+
+배열은 `length`와 own indexed data property로 읽는다. override된 배열 method와 iteration hook을
+포함한 own non-index string property와 symbol property는 JSON 배열 표현 밖이므로 무시한다. 함수 값은
+안정성 검사를 위해 재귀적으로 탐색하지 않으며, 일반 schema 검증이 그 함수를 포함한 경로에서
+거부한다.
+
+`readFieldWeftDoc`은 v1 object graph 규칙을 적용하기 전에 top-level `format`과 `version` data
+property를 안전하게 검사한다. 안정적인 marker가 지원하지 않는 정수 FieldWeft version을 식별하면
+나머지 문서를 v1 입력으로 검사하지 않고 지원하지 않는 version으로 보고한다. accessor 기반 marker는
+실행하지 않고 계속 `input.unstable`로 거부한다.
+
 JavaScript는 Proxy를 신뢰성 있게 감지하는 방법을 제공하지 않으므로 Proxy 기반 객체와 배열은 지원
 대상인 구조화 입력 계약 밖이다. descriptor inspection이나 property read trap이 실패하면 공개 검증·
 읽기 경계 밖으로 예외를 던지는 대신 `input.unstable`로 변환하지만, 예외를 던지지 않는 hostile

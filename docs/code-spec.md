@@ -58,6 +58,23 @@ array elements, metadata entries, and `when` entries. These failures use the
 `input.unstable` diagnostic code with no `params`. Values produced by
 `JSON.parse` already satisfy this rule.
 
+Structured-input rejection reports one `input.unstable` diagnostic and no
+other diagnostics. When multiple unstable locations exist, which location
+determines the diagnostic path is unspecified.
+
+Arrays are consumed through their `length` and own indexed data properties.
+Own non-index string properties and symbol properties, including overridden
+array methods and iteration hooks, are outside the JSON array representation
+and are ignored. Function values are not recursively inspected for stability;
+ordinary schema validation rejects them at the containing path.
+
+`readFieldWeftDoc` safely inspects the top-level `format` and `version` data
+properties before applying v1 object-graph rules. Once those stable markers
+identify an unsupported integer FieldWeft version, the dispatcher reports the
+unsupported version without inspecting the rest of the document as v1 input.
+Accessor-backed markers are still rejected as `input.unstable` without being
+invoked.
+
 Proxy-backed objects and arrays are outside the supported structured-input
 contract because JavaScript does not provide reliable Proxy detection.
 Descriptor-inspection or property-read trap failures are converted to

@@ -42,31 +42,32 @@ export function readCanonicalFieldWeftDoc(
 ): ReadCanonicalFieldWeftDocResult {
   const result = readFieldWeftDoc(input)
   if (result.kind === 'ok') {
+    let doc: CanonicalFieldWeftDocV1
     try {
-      const doc = canonicalizeFieldWeftDoc(result.doc)
-      const canonicalValidation = validateFieldWeftDocV1(doc)
-      if (!canonicalValidation.ok) {
-        return { ok: false, errors: canonicalValidation.errors }
-      }
-      const bytes = canonicalFieldWeftDocUtf8Bytes(doc)
-      if (bytes > FIELD_WEFT_MAX_CANONICAL_BYTES_V1) {
-        return {
-          ok: false,
-          errors: [
-            {
-              code: 'limit.canonical-bytes',
-              path: '',
-              severity: 'error',
-              message: `Compact canonical JSON must not exceed ${FIELD_WEFT_MAX_CANONICAL_BYTES_V1} UTF-8 bytes.`,
-              params: { limit: FIELD_WEFT_MAX_CANONICAL_BYTES_V1 },
-            },
-          ],
-        }
-      }
-      return { ok: true, doc }
+      doc = canonicalizeFieldWeftDoc(result.doc)
     } catch {
       return { ok: false, errors: [unstableInputDiagnostic()] }
     }
+    const canonicalValidation = validateFieldWeftDocV1(doc)
+    if (!canonicalValidation.ok) {
+      return { ok: false, errors: canonicalValidation.errors }
+    }
+    const bytes = canonicalFieldWeftDocUtf8Bytes(doc)
+    if (bytes > FIELD_WEFT_MAX_CANONICAL_BYTES_V1) {
+      return {
+        ok: false,
+        errors: [
+          {
+            code: 'limit.canonical-bytes',
+            path: '',
+            severity: 'error',
+            message: `Compact canonical JSON must not exceed ${FIELD_WEFT_MAX_CANONICAL_BYTES_V1} UTF-8 bytes.`,
+            params: { limit: FIELD_WEFT_MAX_CANONICAL_BYTES_V1 },
+          },
+        ],
+      }
+    }
+    return { ok: true, doc }
   }
   if (result.kind === 'unsupported') {
     return { ok: false, errors: [unsupportedVersionDiagnostic(result.version)] }
