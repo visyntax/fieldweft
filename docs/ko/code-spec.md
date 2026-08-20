@@ -41,19 +41,24 @@ non-enumerable인 required property는 누락으로, optional property는 부재
 아닌 schema 객체는 이 property 규칙을 지키면 custom prototype을 가질 수 있다. metadata map은
 기존의 더 엄격한 plain object 또는 null prototype 조건을 유지한다.
 
-구조화 입력 검증은 JSON에 보이는 값을 own data property를 통해서만 받는다. own enumerable object
-accessor, accessor 기반 배열 요소, sparse array는 accessor를 실행하지 않고 거부한다. 이 정책은
-top-level marker, schema 객체, 배열 요소, metadata entry, `when` entry를 포함한 모든 단계에
-적용한다. 이 실패에는 `params`가 없는 `input.unstable` diagnostic code를 사용한다. `JSON.parse`가
-만든 값은 이미 이 규칙을 만족한다.
+구조화 입력 검증은 schema와 관련되어 실제로 소비하는 값을 own data property를 통해서만 받는다.
+schema 객체의 own enumerable accessor, 소비되는 accessor 기반 배열 요소, 소비되는 범위가 sparse인
+배열은 accessor를 실행하지 않고 거부한다. 이 정책은 top-level marker, schema 객체, 소비되는 배열
+요소, metadata entry, `when` entry에 적용한다. 이 실패에는 `params`가 없는 `input.unstable`
+diagnostic code를 사용한다. `JSON.parse`가 만든 값은 이미 이 규칙을 만족한다.
+
+안정성 검사는 v1 검증이 소비하는 schema 경로와 collection 범위만 따라간다. schema 객체의 property
+descriptor는 검사하지만 unknown property, 잘못된 container type, 자원 한도에 도달해 건너뛴 collection
+요소의 값 아래는 재귀적으로 검사하지 않는다. 이런 입력은 버려지는 하위 트리를 순회하지 않고 해당
+property, type, limit diagnostic을 받는다.
 
 구조화 입력 거부는 `input.unstable` diagnostic 하나만 보고하고 다른 diagnostic은 보고하지 않는다.
 불안정한 위치가 둘 이상이면 어느 위치가 diagnostic path를 결정하는지는 규정하지 않는다.
 
-배열은 `length`와 own indexed data property로 읽는다. override된 배열 method와 iteration hook을
-포함한 own non-index string property와 symbol property는 JSON 배열 표현 밖이므로 무시한다. 함수 값은
-안정성 검사를 위해 재귀적으로 탐색하지 않으며, 일반 schema 검증이 그 함수를 포함한 경로에서
-거부한다.
+배열은 검증이 읽는 범위 안에서 `length`와 own indexed data property로 읽는다. override된 배열
+method와 iteration hook을 포함한 own non-index string property와 symbol property는 JSON 배열 표현
+밖이므로 무시한다. 함수 값은 안정성 검사를 위해 재귀적으로 탐색하지 않으며, 일반 schema 검증이 그
+함수를 포함한 경로에서 거부한다.
 
 `readFieldWeftDoc`은 v1 object graph 규칙을 적용하기 전에 top-level `format`과 `version` data
 property를 안전하게 검사한다. 안정적인 marker가 지원하지 않는 정수 FieldWeft version을 식별하면

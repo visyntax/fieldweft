@@ -245,6 +245,9 @@ const NODE_RELATION_KEYS = [
   'label',
   ...ANNOTATION_KEYS,
 ] as const
+const COORDINATE_KEYS = ['x', 'y'] as const
+const SIZE_KEYS = ['width', 'height'] as const
+const DISCRIMINATOR_KEYS = ['values'] as const
 
 function isRecord(value: unknown): value is RecordValue {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -272,8 +275,13 @@ function childPath(path: string, key: string | number): string {
   return `${path}/${pointerToken(String(key))}`
 }
 
-type UnstableStructuredInput = {
-  path: string
+class UnstableStructuredInputError extends Error {
+  readonly path: string
+
+  constructor(path: string) {
+    super('Structured input contains an unstable property.')
+    this.path = path
+  }
 }
 
 type StructuredMarker =
@@ -291,80 +299,45 @@ function inspectOwnEnumerableDataProperty(
   return { kind: 'data', value: descriptor.value }
 }
 
-function isArrayIndexKey(key: string, length: number): boolean {
-  const index = Number(key)
-  return (
-    Number.isInteger(index) &&
-    index >= 0 &&
-    index < length &&
-    String(index) === key
-  )
+function ownDataValue(
+  value: object,
+  key: PropertyKey,
+  path: string,
+): unknown {
+  const descriptor = Reflect.getOwnPropertyDescriptor(value, key)
+  if (!descriptor?.enumerable) return undefined
+  if (!Object.hasOwn(descriptor, 'value')) {
+    throw new UnstableStructuredInputError(path)
+  }
+  return descriptor.value
 }
 
-/**
- * Rejects JSON-visible accessors without invoking them. Sparse arrays are also
- * rejected so inherited indexed properties cannot participate in validation.
- */
-function findUnstableStructuredInput(
-  input: unknown,
-): UnstableStructuredInput | undefined {
-  const pending: Array<{ value: unknown; path: string }> = [
-    { value: input, path: '' },
-  ]
-  const seen = new WeakSet<object>()
-
-  while (pending.length) {
-    const current = pending.pop() as { value: unknown; path: string }
-    if (
-      typeof current.value !== 'object' ||
-      current.value === null ||
-      seen.has(current.value)
-    ) {
-      continue
-    }
-    seen.add(current.value)
-
-    try {
-      const array = Array.isArray(current.value)
-      let arrayLength = 0
-      if (array) {
-        const lengthDescriptor = Reflect.getOwnPropertyDescriptor(
-          current.value,
-          'length',
-        )
-        if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, 'value')) {
-          return current
-        }
-        arrayLength = lengthDescriptor.value as number
-      }
-
-      let arrayElementCount = 0
-      for (const key of Reflect.ownKeys(current.value)) {
-        const descriptor = Reflect.getOwnPropertyDescriptor(current.value, key)
-        const keyPath =
-          typeof key === 'string' ? childPath(current.path, key) : current.path
-        if (!descriptor) return { path: keyPath }
-
-        const arrayElement =
-          array &&
-          typeof key === 'string' &&
-          isArrayIndexKey(key, arrayLength)
-        const jsonVisibleObjectProperty =
-          !array && typeof key === 'string' && descriptor.enumerable
-        if (!arrayElement && !jsonVisibleObjectProperty) continue
-
-        if (!Object.hasOwn(descriptor, 'value')) return { path: keyPath }
-        if (arrayElement) arrayElementCount++
-        pending.push({ value: descriptor.value, path: keyPath })
-      }
-
-      if (array && arrayElementCount !== arrayLength) return current
-    } catch {
-      return current
-    }
+function arrayValue(value: unknown[], index: number, path: string): unknown {
+  const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index))
+  if (!descriptor) throw new UnstableStructuredInputError(path)
+  if (!Object.hasOwn(descriptor, 'value')) {
+    throw new UnstableStructuredInputError(childPath(path, index))
   }
+  return descriptor.value
+}
 
-  return undefined
+function ownDataEntries(
+  value: RecordValue,
+  path: string,
+): Array<[string, unknown]> {
+  const entries: Array<[string, unknown]> = []
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') continue
+    const descriptor = Reflect.getOwnPropertyDescriptor(value, key)
+    const keyPath = childPath(path, key)
+    if (!descriptor) throw new UnstableStructuredInputError(keyPath)
+    if (!descriptor.enumerable) continue
+    if (!Object.hasOwn(descriptor, 'value')) {
+      throw new UnstableStructuredInputError(keyPath)
+    }
+    entries.push([key, descriptor.value])
+  }
+  return entries
 }
 
 function unstableStructuredInputDiagnostic(
@@ -404,7 +377,7 @@ function checkKnownKeys(
   state: ValidationState,
 ): void {
   const allowedSet = new Set(allowed)
-  for (const key of Object.keys(value)) {
+  for (const [key] of ownDataEntries(value, path)) {
     if (!allowedSet.has(key)) {
       addError(
         state,
@@ -428,11 +401,12 @@ function requiredArray(
     addError(state, 'property.required', keyPath, 'Required property is missing.')
     return undefined
   }
-  if (!Array.isArray(value[key])) {
+  const raw = ownDataValue(value, key, keyPath)
+  if (!Array.isArray(raw)) {
     addError(state, 'type.array', keyPath, 'Expected an array.')
     return undefined
   }
-  return value[key]
+  return raw
 }
 
 function requiredName(
@@ -569,7 +543,7 @@ function validateAnnotations(
           break
         }
         state.tagCount++
-        const tag = value.tags[index]
+        const tag = arrayValue(value.tags, index, tagsPath)
         if (typeof tag !== 'string' || tag.length === 0) {
           addError(
             state,
@@ -677,7 +651,7 @@ function validateAnnotations(
       consumeAnnotationCodePoints(key, keyPath, state)
     }
 
-    const metaValue = value.meta[key]
+    const metaValue = ownDataValue(value.meta, key, keyPath)
     if (typeof metaValue === 'string') {
       if (
         checkStringLimit(
@@ -817,8 +791,8 @@ function checkCoordinate(
     addError(state, 'type.object', path, 'Expected a position object.')
     return
   }
-  checkKnownKeys(value, ['x', 'y'], path, state)
-  for (const key of ['x', 'y'] as const) {
+  checkKnownKeys(value, COORDINATE_KEYS, path, state)
+  for (const key of COORDINATE_KEYS) {
     const itemPath = childPath(path, key)
     if (!hasOwn(value, key)) {
       addError(state, 'property.required', itemPath, 'Required coordinate is missing.')
@@ -842,8 +816,8 @@ function checkSize(value: unknown, path: string, state: ValidationState): void {
     addError(state, 'type.object', path, 'Expected a size object.')
     return
   }
-  checkKnownKeys(value, ['width', 'height'], path, state)
-  for (const key of ['width', 'height'] as const) {
+  checkKnownKeys(value, SIZE_KEYS, path, state)
+  for (const key of SIZE_KEYS) {
     const itemPath = childPath(path, key)
     if (!hasOwn(value, key)) {
       addError(state, 'property.required', itemPath, 'Required size component is missing.')
@@ -890,7 +864,7 @@ function validateStringSet(
   const strings: string[] = []
   const seen = new Map<string, string>()
   for (let index = 0; index < value.length; index++) {
-    const item = value[index]
+    const item = arrayValue(value, index, path)
     const itemPath = childPath(path, index)
     if (typeof item !== 'string' || item.length === 0) {
       addError(
@@ -941,7 +915,7 @@ function validateDiscriminator(
     addError(state, 'type.object', path, 'Expected a discriminator object with a values property.')
     return undefined
   }
-  checkKnownKeys(value, ['values'], path, state)
+  checkKnownKeys(value, DISCRIMINATOR_KEYS, path, state)
   if (fieldType !== 'string') {
     addError(
       state,
@@ -986,7 +960,7 @@ function validateWhen(
     addError(state, 'type.object', path, 'Expected an object keyed by discriminator field IDs.')
     return undefined
   }
-  for (const [fieldId, rawValues] of Object.entries(value)) {
+  for (const [fieldId, rawValues] of ownDataEntries(value, path)) {
     const valuesPath = childPath(path, fieldId)
     checkId(fieldId, valuesPath, state, true)
     const values = validateStringSet(
@@ -1059,7 +1033,7 @@ function validateFields(
     }
     state.fieldCount++
 
-    const raw = fields[index]
+    const raw = arrayValue(fields, index, path)
     if (!isRecord(raw)) {
       addError(state, 'type.object', fieldPath, 'Expected a field object.')
       continue
@@ -1231,7 +1205,7 @@ function validateEntity(raw: unknown, path: string, state: ValidationState): voi
     if (ids && Array.isArray(raw.collapsed)) {
       const seen = new Set<string>()
       for (let index = 0; index < raw.collapsed.length; index++) {
-        const fieldId = raw.collapsed[index]
+        const fieldId = arrayValue(raw.collapsed, index, collapsedPath)
         if (typeof fieldId !== 'string' || fieldId.length === 0 || seen.has(fieldId)) continue
         seen.add(fieldId)
         const itemPath = childPath(collapsedPath, index)
@@ -1304,7 +1278,7 @@ function validateBoundary(raw: unknown, path: string, state: ValidationState): v
     if (members && Array.isArray(raw.members)) {
       const seen = new Set<string>()
       for (let index = 0; index < raw.members.length; index++) {
-        const memberId = raw.members[index]
+        const memberId = arrayValue(raw.members, index, membersPath)
         if (typeof memberId !== 'string' || memberId.length === 0 || seen.has(memberId)) continue
         seen.add(memberId)
         const itemPath = childPath(membersPath, index)
@@ -1424,7 +1398,10 @@ function validateNodeRelation(
 
 function validateWhenReferences(state: ValidationState): void {
   for (const ref of state.whenRefs) {
-    for (const [discriminatorId, rawValues] of Object.entries(ref.when)) {
+    for (const [discriminatorId, rawValues] of ownDataEntries(
+      ref.when,
+      ref.path,
+    )) {
       if (!ID_RE.test(discriminatorId) || isReservedFieldWeftId(discriminatorId)) continue
       const path = childPath(ref.path, discriminatorId)
       if (ref.fieldId === discriminatorId) {
@@ -1468,7 +1445,7 @@ function validateWhenReferences(state: ValidationState): void {
       }
       if (!Array.isArray(rawValues)) continue
       for (let index = 0; index < rawValues.length; index++) {
-        const value = rawValues[index]
+        const value = arrayValue(rawValues, index, path)
         if (typeof value === 'string' && !target.discriminatorValues?.includes(value)) {
           addError(
             state,
@@ -1662,7 +1639,7 @@ function validateNodes(
   for (let index = 0; index < values.length; index++) {
     if (state.nodeVisits >= FIELD_WEFT_MAX_NODES_V1) return
     state.nodeVisits++
-    validate(values[index], childPath(basePath, index), state)
+    validate(arrayValue(values, index, basePath), childPath(basePath, index), state)
   }
 }
 
@@ -1736,7 +1713,7 @@ function validateStableFieldWeftDocV1(
     const count = Math.min(nodeRelations.length, remainingRelations)
     for (let index = 0; index < count; index++) {
       validateNodeRelation(
-        nodeRelations[index],
+        arrayValue(nodeRelations, index, '/nodeRelations'),
         childPath('/nodeRelations', index),
         state,
       )
@@ -1746,7 +1723,11 @@ function validateStableFieldWeftDocV1(
   if (mappings) {
     const count = Math.min(mappings.length, remainingRelations)
     for (let index = 0; index < count; index++) {
-      validateMapping(mappings[index], childPath('/mappings', index), state)
+      validateMapping(
+        arrayValue(mappings, index, '/mappings'),
+        childPath('/mappings', index),
+        state,
+      )
     }
   }
 
@@ -1763,19 +1744,16 @@ function validateStableFieldWeftDocV1(
 export function validateFieldWeftDocV1(
   input: unknown,
 ): ValidateFieldWeftDocResultV1 {
-  const unstable = findUnstableStructuredInput(input)
-  if (unstable) {
-    return {
-      ok: false,
-      errors: [unstableStructuredInputDiagnostic(unstable.path)],
-    }
-  }
   try {
     return validateStableFieldWeftDocV1(input)
-  } catch {
+  } catch (error) {
     return {
       ok: false,
-      errors: [unstableStructuredInputDiagnostic('')],
+      errors: [
+        unstableStructuredInputDiagnostic(
+          error instanceof UnstableStructuredInputError ? error.path : '',
+        ),
+      ],
     }
   }
 }
@@ -1807,21 +1785,18 @@ export function readFieldWeftDoc(input: unknown): ReadFieldWeftDocResult {
         return { kind: 'unsupported', version: versionMarker.value }
       }
     }
-    const unstable = findUnstableStructuredInput(input)
-    if (unstable) {
-      return {
-        kind: 'invalid',
-        errors: [unstableStructuredInputDiagnostic(unstable.path)],
-      }
-    }
     const result = validateStableFieldWeftDocV1(input)
     return result.ok
       ? { kind: 'ok', doc: result.doc }
       : { kind: 'invalid', errors: result.errors }
-  } catch {
+  } catch (error) {
     return {
       kind: 'invalid',
-      errors: [unstableStructuredInputDiagnostic('')],
+      errors: [
+        unstableStructuredInputDiagnostic(
+          error instanceof UnstableStructuredInputError ? error.path : '',
+        ),
+      ],
     }
   }
 }

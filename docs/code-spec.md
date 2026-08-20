@@ -50,23 +50,31 @@ non-enumerable optional property is absent. Non-metadata schema objects may
 have custom prototypes when their schema properties follow this rule.
 Metadata maps retain the stricter plain-object or null-prototype requirement.
 
-Structured-input validation accepts JSON-visible values only through own data
-properties. An own enumerable object accessor, an accessor-backed array
-element, or a sparse array is rejected without invoking the accessor. This
-policy applies at every level, including top-level markers, schema objects,
-array elements, metadata entries, and `when` entries. These failures use the
-`input.unstable` diagnostic code with no `params`. Values produced by
-`JSON.parse` already satisfy this rule.
+Structured-input validation consumes schema-relevant values only through own
+data properties. An own enumerable accessor on a schema object, an
+accessor-backed consumed array element, or a sparse consumed array range is
+rejected without invoking the accessor. This policy applies to top-level
+markers, schema objects, consumed array elements, metadata entries, and
+`when` entries. These failures use the `input.unstable` diagnostic code with
+no `params`. Values produced by `JSON.parse` already satisfy this rule.
+
+Stability inspection follows only schema paths and collection ranges that v1
+validation consumes. It inspects schema-object property descriptors but does
+not recursively inspect values below unknown properties, invalid container
+types, or collection elements skipped after a resource limit is reached.
+Those inputs receive the applicable property, type, or limit diagnostic
+without traversing the discarded subtree.
 
 Structured-input rejection reports one `input.unstable` diagnostic and no
 other diagnostics. When multiple unstable locations exist, which location
 determines the diagnostic path is unspecified.
 
-Arrays are consumed through their `length` and own indexed data properties.
-Own non-index string properties and symbol properties, including overridden
-array methods and iteration hooks, are outside the JSON array representation
-and are ignored. Function values are not recursively inspected for stability;
-ordinary schema validation rejects them at the containing path.
+Arrays are consumed through their `length` and own indexed data properties
+within the ranges validation reads. Own non-index string properties and symbol
+properties, including overridden array methods and iteration hooks, are
+outside the JSON array representation and are ignored. Function values are not
+recursively inspected for stability; ordinary schema validation rejects them
+at the containing path.
 
 `readFieldWeftDoc` safely inspects the top-level `format` and `version` data
 properties before applying v1 object-graph rules. Once those stable markers

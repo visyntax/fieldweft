@@ -606,6 +606,38 @@ function addValidNodeRelation(doc, label) {
   }
 }
 
+// Stability inspection follows only schema paths that validation consumes.
+{
+  const unknown = makeValidDoc()
+  let unknownOwnKeys = 0
+  unknown.unused = new Proxy(
+    { nested: new Array(200_000).fill({}) },
+    {
+      ownKeys() {
+        unknownOwnKeys++
+        throw new Error('unknown subtrees must not be inspected')
+      },
+    },
+  )
+  errorWithCode(validateFieldWeftDocV1(unknown), 'property.unknown')
+  errorWithCode(readCanonicalFieldWeftDoc(unknown), 'property.unknown')
+  assert.equal(unknownOwnKeys, 0)
+
+  const invalidContainer = makeValidDoc()
+  let invalidOwnKeys = 0
+  invalidContainer.entities = new Proxy(
+    { nested: new Array(200_000).fill({}) },
+    {
+      ownKeys() {
+        invalidOwnKeys++
+        throw new Error('invalid containers must not be inspected')
+      },
+    },
+  )
+  errorWithCode(validateFieldWeftDocV1(invalidContainer), 'type.array')
+  assert.equal(invalidOwnKeys, 0)
+}
+
 // Array methods and iteration hooks are outside the JSON array representation.
 {
   const ownMap = makeValidDoc()
@@ -1145,11 +1177,12 @@ function addValidNodeRelation(doc, label) {
   errorWithCode(validateFieldWeftDocV1(reservedMapping), 'id.reserved')
 
   const deep = makeValidDoc()
-  let field = {
+  const beyondDepth = {
     id: `deep_${FIELD_WEFT_MAX_FIELD_DEPTH_V1 + 1}`,
     name: `deep_${FIELD_WEFT_MAX_FIELD_DEPTH_V1 + 1}`,
     type: 'object',
   }
+  let field = beyondDepth
   for (let depth = FIELD_WEFT_MAX_FIELD_DEPTH_V1; depth >= 1; depth--) {
     field = {
       id: `deep_${depth}`,
@@ -1161,15 +1194,53 @@ function addValidNodeRelation(doc, label) {
   deep.entities[0].fields = [field]
   deep.entities[0].collapsed = []
   deep.mappings = []
+  let beyondDepthReads = 0
+  Object.defineProperty(beyondDepth, 'id', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      beyondDepthReads++
+      throw new Error('fields beyond the depth limit must not be inspected')
+    },
+  })
   errorWithCode(validateFieldWeftDocV1(deep), 'limit.field-depth')
+  assert.equal(beyondDepthReads, 0)
 
   const tooMany = makeValidDoc()
-  tooMany.entities[0].fields = new Array(FIELD_WEFT_MAX_FIELDS_V1 + 1).fill(
-    null,
-  )
+  tooMany.entities[0].fields = new Array(FIELD_WEFT_MAX_FIELDS_V1 + 1)
+  let excessFieldReads = 0
+  Object.defineProperty(tooMany.entities[0].fields, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      excessFieldReads++
+      throw new Error('fields beyond the count limit must not be inspected')
+    },
+  })
   tooMany.entities[0].collapsed = []
   tooMany.mappings = []
   errorWithCode(validateFieldWeftDocV1(tooMany), 'limit.fields')
+  assert.equal(excessFieldReads, 0)
+
+  const tooManyMetaEntries = makeValidDoc()
+  tooManyMetaEntries.entities[0].meta = {}
+  for (let index = 0; index < FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1; index++) {
+    tooManyMetaEntries.entities[0].meta[`key_${index}`] = index
+  }
+  let excessMetaReads = 0
+  Object.defineProperty(tooManyMetaEntries.entities[0].meta, 'excess', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      excessMetaReads++
+      throw new Error('metadata beyond the entry limit must not be inspected')
+    },
+  })
+  errorWithCode(
+    validateFieldWeftDocV1(tooManyMetaEntries),
+    'limit.meta-per-object',
+  )
+  assert.equal(excessMetaReads, 0)
 }
 
 // node relation은 구조·endpoint·self 관계와 mapping을 합친 ID 공간을 검증한다.
