@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 
-const { parseFieldWeftDocJson, readCanonicalFieldWeftDoc } =
+const {
+  parseFieldWeftDocJson,
+  readCanonicalFieldWeftDoc,
+  validateFieldWeftDocV1,
+} =
   await import('../dist/index.js')
 const {
   FIELD_WEFT_MAX_CANONICAL_BYTES_V1,
@@ -26,6 +30,7 @@ function emptyDoc(extra = {}) {
   const result = readCanonicalFieldWeftDoc(input)
   assert.equal(result.ok, true)
   assert.equal(result.doc.version, 1)
+  assert.equal(validateFieldWeftDocV1(result.doc).ok, true)
   assert.deepEqual(Object.keys(result.doc), [
     'format',
     'version',
@@ -35,6 +40,39 @@ function emptyDoc(extra = {}) {
     'nodeRelations',
     'mappings',
   ])
+}
+
+// Accessor-backed structured input is rejected without invoking a getter.
+{
+  const input = emptyDoc({
+    entities: [{ id: 'entity', name: 'Entity', kind: 'db', fields: [] }],
+  })
+  let reads = 0
+  Object.defineProperty(input.entities[0], 'id', {
+    enumerable: true,
+    get() {
+      reads++
+      return reads === 1 ? 'entity' : '!'.repeat(500)
+    },
+  })
+
+  const result = readCanonicalFieldWeftDoc(input)
+  assert.equal(result.ok, false)
+  assert.equal(result.errors[0].code, 'input.unstable')
+  assert.equal(result.errors[0].path, '/entities/0/id')
+  assert.equal(reads, 0)
+
+  const unsupported = emptyDoc()
+  Object.defineProperty(unsupported, 'version', {
+    enumerable: true,
+    get() {
+      throw new Error('boom')
+    },
+  })
+  const unsupportedResult = readCanonicalFieldWeftDoc(unsupported)
+  assert.equal(unsupportedResult.ok, false)
+  assert.equal(unsupportedResult.errors[0].code, 'input.unstable')
+  assert.equal(unsupportedResult.errors[0].path, '/version')
 }
 
 // Unsupported versions, parse failures, and source limits use structured diagnostics.

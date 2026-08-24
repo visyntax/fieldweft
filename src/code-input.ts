@@ -7,6 +7,7 @@ import {
 import { canonicalFieldWeftDocUtf8Bytes } from './code-serialize.js'
 import {
   readFieldWeftDoc,
+  validateFieldWeftDocV1,
   type FieldWeftDiagnostic,
 } from './code-validate.js'
 
@@ -25,13 +26,32 @@ function unsupportedVersionDiagnostic(version: unknown): FieldWeftDiagnostic {
   }
 }
 
+function unstableInputDiagnostic(): FieldWeftDiagnostic {
+  return {
+    code: 'input.unstable',
+    path: '',
+    severity: 'error',
+    message:
+      'Structured input must use stable own data properties and dense arrays.',
+  }
+}
+
 /** Shared unknown → validate → canonicalize pipeline for external input boundaries. */
 export function readCanonicalFieldWeftDoc(
   input: unknown,
 ): ReadCanonicalFieldWeftDocResult {
   const result = readFieldWeftDoc(input)
   if (result.kind === 'ok') {
-    const doc = canonicalizeFieldWeftDoc(result.doc)
+    let doc: CanonicalFieldWeftDocV1
+    try {
+      doc = canonicalizeFieldWeftDoc(result.doc)
+    } catch {
+      return { ok: false, errors: [unstableInputDiagnostic()] }
+    }
+    const canonicalValidation = validateFieldWeftDocV1(doc)
+    if (!canonicalValidation.ok) {
+      return { ok: false, errors: canonicalValidation.errors }
+    }
     const bytes = canonicalFieldWeftDocUtf8Bytes(doc)
     if (bytes > FIELD_WEFT_MAX_CANONICAL_BYTES_V1) {
       return {

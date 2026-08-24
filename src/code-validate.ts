@@ -245,6 +245,9 @@ const NODE_RELATION_KEYS = [
   'label',
   ...ANNOTATION_KEYS,
 ] as const
+const COORDINATE_KEYS = ['x', 'y'] as const
+const SIZE_KEYS = ['width', 'height'] as const
+const DISCRIMINATOR_KEYS = ['values'] as const
 
 function isRecord(value: unknown): value is RecordValue {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -272,6 +275,83 @@ function childPath(path: string, key: string | number): string {
   return `${path}/${pointerToken(String(key))}`
 }
 
+class UnstableStructuredInputError extends Error {
+  readonly path: string
+
+  constructor(path: string) {
+    super('Structured input contains an unstable property.')
+    this.path = path
+  }
+}
+
+type StructuredMarker =
+  | { kind: 'absent' }
+  | { kind: 'data'; value: unknown }
+  | { kind: 'unstable' }
+
+function inspectOwnEnumerableDataProperty(
+  value: RecordValue,
+  key: string,
+): StructuredMarker {
+  const descriptor = Reflect.getOwnPropertyDescriptor(value, key)
+  if (!descriptor?.enumerable) return { kind: 'absent' }
+  if (!Object.hasOwn(descriptor, 'value')) return { kind: 'unstable' }
+  return { kind: 'data', value: descriptor.value }
+}
+
+function ownDataValue(
+  value: object,
+  key: PropertyKey,
+  path: string,
+): unknown {
+  const descriptor = Reflect.getOwnPropertyDescriptor(value, key)
+  if (!descriptor?.enumerable) return undefined
+  if (!Object.hasOwn(descriptor, 'value')) {
+    throw new UnstableStructuredInputError(path)
+  }
+  return descriptor.value
+}
+
+function arrayValue(value: unknown[], index: number, path: string): unknown {
+  const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index))
+  if (!descriptor) throw new UnstableStructuredInputError(path)
+  if (!Object.hasOwn(descriptor, 'value')) {
+    throw new UnstableStructuredInputError(childPath(path, index))
+  }
+  return descriptor.value
+}
+
+function ownDataEntries(
+  value: RecordValue,
+  path: string,
+): Array<[string, unknown]> {
+  const entries: Array<[string, unknown]> = []
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') continue
+    const descriptor = Reflect.getOwnPropertyDescriptor(value, key)
+    const keyPath = childPath(path, key)
+    if (!descriptor) throw new UnstableStructuredInputError(keyPath)
+    if (!descriptor.enumerable) continue
+    if (!Object.hasOwn(descriptor, 'value')) {
+      throw new UnstableStructuredInputError(keyPath)
+    }
+    entries.push([key, descriptor.value])
+  }
+  return entries
+}
+
+function unstableStructuredInputDiagnostic(
+  path: string,
+): FieldWeftDiagnostic {
+  return {
+    code: 'input.unstable',
+    path,
+    severity: 'error',
+    message:
+      'Structured input must use stable own data properties and dense arrays.',
+  }
+}
+
 function addError(
   state: ValidationState,
   code: string,
@@ -297,7 +377,7 @@ function checkKnownKeys(
   state: ValidationState,
 ): void {
   const allowedSet = new Set(allowed)
-  for (const key of Object.keys(value)) {
+  for (const [key] of ownDataEntries(value, path)) {
     if (!allowedSet.has(key)) {
       addError(
         state,
@@ -321,11 +401,12 @@ function requiredArray(
     addError(state, 'property.required', keyPath, 'Required property is missing.')
     return undefined
   }
-  if (!Array.isArray(value[key])) {
+  const raw = ownDataValue(value, key, keyPath)
+  if (!Array.isArray(raw)) {
     addError(state, 'type.array', keyPath, 'Expected an array.')
     return undefined
   }
-  return value[key]
+  return raw
 }
 
 function requiredName(
@@ -462,7 +543,7 @@ function validateAnnotations(
           break
         }
         state.tagCount++
-        const tag = value.tags[index]
+        const tag = arrayValue(value.tags, index, tagsPath)
         if (typeof tag !== 'string' || tag.length === 0) {
           addError(
             state,
@@ -570,7 +651,7 @@ function validateAnnotations(
       consumeAnnotationCodePoints(key, keyPath, state)
     }
 
-    const metaValue = value.meta[key]
+    const metaValue = ownDataValue(value.meta, key, keyPath)
     if (typeof metaValue === 'string') {
       if (
         checkStringLimit(
@@ -710,8 +791,8 @@ function checkCoordinate(
     addError(state, 'type.object', path, 'Expected a position object.')
     return
   }
-  checkKnownKeys(value, ['x', 'y'], path, state)
-  for (const key of ['x', 'y'] as const) {
+  checkKnownKeys(value, COORDINATE_KEYS, path, state)
+  for (const key of COORDINATE_KEYS) {
     const itemPath = childPath(path, key)
     if (!hasOwn(value, key)) {
       addError(state, 'property.required', itemPath, 'Required coordinate is missing.')
@@ -735,8 +816,8 @@ function checkSize(value: unknown, path: string, state: ValidationState): void {
     addError(state, 'type.object', path, 'Expected a size object.')
     return
   }
-  checkKnownKeys(value, ['width', 'height'], path, state)
-  for (const key of ['width', 'height'] as const) {
+  checkKnownKeys(value, SIZE_KEYS, path, state)
+  for (const key of SIZE_KEYS) {
     const itemPath = childPath(path, key)
     if (!hasOwn(value, key)) {
       addError(state, 'property.required', itemPath, 'Required size component is missing.')
@@ -782,7 +863,8 @@ function validateStringSet(
   }
   const strings: string[] = []
   const seen = new Map<string, string>()
-  value.forEach((item, index) => {
+  for (let index = 0; index < value.length; index++) {
+    const item = arrayValue(value, index, path)
     const itemPath = childPath(path, index)
     if (typeof item !== 'string' || item.length === 0) {
       addError(
@@ -791,7 +873,7 @@ function validateStringSet(
         itemPath,
         'Expected a non-empty string.',
       )
-      return
+      continue
     }
     if (
       maxChars != null &&
@@ -803,7 +885,7 @@ function validateStringSet(
         'limit.string.variant-value',
       )
     ) {
-      return
+      continue
     }
     const firstPath = seen.get(item)
     if (firstPath) {
@@ -815,11 +897,11 @@ function validateStringSet(
         { value: item },
         [{ path: itemPath, message: 'Duplicate location.' }],
       )
-      return
+      continue
     }
     seen.set(item, itemPath)
     strings.push(item)
-  })
+  }
   return strings
 }
 
@@ -833,7 +915,7 @@ function validateDiscriminator(
     addError(state, 'type.object', path, 'Expected a discriminator object with a values property.')
     return undefined
   }
-  checkKnownKeys(value, ['values'], path, state)
+  checkKnownKeys(value, DISCRIMINATOR_KEYS, path, state)
   if (fieldType !== 'string') {
     addError(
       state,
@@ -878,7 +960,7 @@ function validateWhen(
     addError(state, 'type.object', path, 'Expected an object keyed by discriminator field IDs.')
     return undefined
   }
-  for (const [fieldId, rawValues] of Object.entries(value)) {
+  for (const [fieldId, rawValues] of ownDataEntries(value, path)) {
     const valuesPath = childPath(path, fieldId)
     checkId(fieldId, valuesPath, state, true)
     const values = validateStringSet(
@@ -951,7 +1033,7 @@ function validateFields(
     }
     state.fieldCount++
 
-    const raw = fields[index]
+    const raw = arrayValue(fields, index, path)
     if (!isRecord(raw)) {
       addError(state, 'type.object', fieldPath, 'Expected a field object.')
       continue
@@ -1122,14 +1204,15 @@ function validateEntity(raw: unknown, path: string, state: ValidationState): voi
     const ids = validateStringSet(raw.collapsed, collapsedPath, state)
     if (ids && Array.isArray(raw.collapsed)) {
       const seen = new Set<string>()
-      raw.collapsed.forEach((fieldId, index) => {
-        if (typeof fieldId !== 'string' || fieldId.length === 0 || seen.has(fieldId)) return
+      for (let index = 0; index < raw.collapsed.length; index++) {
+        const fieldId = arrayValue(raw.collapsed, index, collapsedPath)
+        if (typeof fieldId !== 'string' || fieldId.length === 0 || seen.has(fieldId)) continue
         seen.add(fieldId)
         const itemPath = childPath(collapsedPath, index)
         if (checkId(fieldId, itemPath, state, true)) {
           state.collapsedRefs.push({ ownerId, fieldId, path: itemPath })
         }
-      })
+      }
     }
   }
 }
@@ -1194,14 +1277,15 @@ function validateBoundary(raw: unknown, path: string, state: ValidationState): v
     const members = validateStringSet(raw.members, membersPath, state)
     if (members && Array.isArray(raw.members)) {
       const seen = new Set<string>()
-      raw.members.forEach((memberId, index) => {
-        if (typeof memberId !== 'string' || memberId.length === 0 || seen.has(memberId)) return
+      for (let index = 0; index < raw.members.length; index++) {
+        const memberId = arrayValue(raw.members, index, membersPath)
+        if (typeof memberId !== 'string' || memberId.length === 0 || seen.has(memberId)) continue
         seen.add(memberId)
         const itemPath = childPath(membersPath, index)
         if (checkId(memberId, itemPath, state, true)) {
           state.memberRefs.push({ memberId, path: itemPath })
         }
-      })
+      }
     }
   }
 }
@@ -1314,7 +1398,10 @@ function validateNodeRelation(
 
 function validateWhenReferences(state: ValidationState): void {
   for (const ref of state.whenRefs) {
-    for (const [discriminatorId, rawValues] of Object.entries(ref.when)) {
+    for (const [discriminatorId, rawValues] of ownDataEntries(
+      ref.when,
+      ref.path,
+    )) {
       if (!ID_RE.test(discriminatorId) || isReservedFieldWeftId(discriminatorId)) continue
       const path = childPath(ref.path, discriminatorId)
       if (ref.fieldId === discriminatorId) {
@@ -1357,7 +1444,8 @@ function validateWhenReferences(state: ValidationState): void {
         continue
       }
       if (!Array.isArray(rawValues)) continue
-      rawValues.forEach((value, index) => {
+      for (let index = 0; index < rawValues.length; index++) {
+        const value = arrayValue(rawValues, index, path)
         if (typeof value === 'string' && !target.discriminatorValues?.includes(value)) {
           addError(
             state,
@@ -1367,7 +1455,7 @@ function validateWhenReferences(state: ValidationState): void {
             { value },
           )
         }
-      })
+      }
     }
   }
 }
@@ -1551,11 +1639,13 @@ function validateNodes(
   for (let index = 0; index < values.length; index++) {
     if (state.nodeVisits >= FIELD_WEFT_MAX_NODES_V1) return
     state.nodeVisits++
-    validate(values[index], childPath(basePath, index), state)
+    validate(arrayValue(values, index, basePath), childPath(basePath, index), state)
   }
 }
 
-export function validateFieldWeftDocV1(input: unknown): ValidateFieldWeftDocResultV1 {
+function validateStableFieldWeftDocV1(
+  input: unknown,
+): ValidateFieldWeftDocResultV1 {
   const state = createState()
   if (!isRecord(input)) {
     addError(state, 'type.object', '', 'The top-level FieldWeft value must be an object.')
@@ -1623,7 +1713,7 @@ export function validateFieldWeftDocV1(input: unknown): ValidateFieldWeftDocResu
     const count = Math.min(nodeRelations.length, remainingRelations)
     for (let index = 0; index < count; index++) {
       validateNodeRelation(
-        nodeRelations[index],
+        arrayValue(nodeRelations, index, '/nodeRelations'),
         childPath('/nodeRelations', index),
         state,
       )
@@ -1633,7 +1723,11 @@ export function validateFieldWeftDocV1(input: unknown): ValidateFieldWeftDocResu
   if (mappings) {
     const count = Math.min(mappings.length, remainingRelations)
     for (let index = 0; index < count; index++) {
-      validateMapping(mappings[index], childPath('/mappings', index), state)
+      validateMapping(
+        arrayValue(mappings, index, '/mappings'),
+        childPath('/mappings', index),
+        state,
+      )
     }
   }
 
@@ -1647,19 +1741,62 @@ export function validateFieldWeftDocV1(input: unknown): ValidateFieldWeftDocResu
   return { ok: true, doc: input as ValidFieldWeftDocV1 }
 }
 
-export function readFieldWeftDoc(input: unknown): ReadFieldWeftDocResult {
-  if (
-    isRecord(input) &&
-    hasOwn(input, 'format') &&
-    hasOwn(input, 'version') &&
-    input.format === FIELD_WEFT_FORMAT &&
-    Number.isInteger(input.version) &&
-    input.version !== FIELD_WEFT_VERSION_V1
-  ) {
-    return { kind: 'unsupported', version: input.version }
+export function validateFieldWeftDocV1(
+  input: unknown,
+): ValidateFieldWeftDocResultV1 {
+  try {
+    return validateStableFieldWeftDocV1(input)
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [
+        unstableStructuredInputDiagnostic(
+          error instanceof UnstableStructuredInputError ? error.path : '',
+        ),
+      ],
+    }
   }
-  const result = validateFieldWeftDocV1(input)
-  return result.ok
-    ? { kind: 'ok', doc: result.doc }
-    : { kind: 'invalid', errors: result.errors }
+}
+
+export function readFieldWeftDoc(input: unknown): ReadFieldWeftDocResult {
+  try {
+    if (isRecord(input)) {
+      const formatMarker = inspectOwnEnumerableDataProperty(input, 'format')
+      if (formatMarker.kind === 'unstable') {
+        return {
+          kind: 'invalid',
+          errors: [unstableStructuredInputDiagnostic('/format')],
+        }
+      }
+      const versionMarker = inspectOwnEnumerableDataProperty(input, 'version')
+      if (versionMarker.kind === 'unstable') {
+        return {
+          kind: 'invalid',
+          errors: [unstableStructuredInputDiagnostic('/version')],
+        }
+      }
+      if (
+        formatMarker.kind === 'data' &&
+        formatMarker.value === FIELD_WEFT_FORMAT &&
+        versionMarker.kind === 'data' &&
+        Number.isInteger(versionMarker.value) &&
+        versionMarker.value !== FIELD_WEFT_VERSION_V1
+      ) {
+        return { kind: 'unsupported', version: versionMarker.value }
+      }
+    }
+    const result = validateStableFieldWeftDocV1(input)
+    return result.ok
+      ? { kind: 'ok', doc: result.doc }
+      : { kind: 'invalid', errors: result.errors }
+  } catch (error) {
+    return {
+      kind: 'invalid',
+      errors: [
+        unstableStructuredInputDiagnostic(
+          error instanceof UnstableStructuredInputError ? error.path : '',
+        ),
+      ],
+    }
+  }
 }

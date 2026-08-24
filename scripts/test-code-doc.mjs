@@ -483,7 +483,12 @@ function addValidNodeRelation(doc, label) {
 {
   const customPrototype = makeValidDoc()
   customPrototype.entities[0] = Object.assign(
-    Object.create({ inheritedUnknown: true }),
+    Object.create({
+      inheritedUnknown: true,
+      get inheritedAccessor() {
+        throw new Error('inherited accessors must remain unobserved')
+      },
+    }),
     customPrototype.entities[0],
   )
   assert.equal(validateFieldWeftDocV1(customPrototype).ok, true)
@@ -499,6 +504,369 @@ function addValidNodeRelation(doc, label) {
 
   const parsed = JSON.parse(JSON.stringify(makeValidDoc()))
   assert.equal(validateFieldWeftDocV1(parsed).ok, true)
+}
+
+// Structured-input accessors and sparse arrays are rejected without observation.
+{
+  const accessorCases = [
+    ['top-level version', (doc) => [doc, 'version', '/version']],
+    [
+      'nested required property',
+      (doc) => [doc.entities[0], 'id', '/entities/0/id'],
+    ],
+    [
+      'optional nested property',
+      (doc) => [doc.entities[0], 'position', '/entities/0/position'],
+    ],
+    ['array element', (doc) => [doc.entities, '0', '/entities/0']],
+    [
+      'metadata entry',
+      (doc) => {
+        doc.entities[0].meta = { owner: 'payments' }
+        return [doc.entities[0].meta, 'owner', '/entities/0/meta/owner']
+      },
+    ],
+    [
+      'when entry',
+      (doc) => [
+        doc.entities[0].fields[4].when,
+        'status_f',
+        '/entities/0/fields/4/when/status_f',
+      ],
+    ],
+    [
+      'when array element',
+      (doc) => [
+        doc.entities[0].fields[4].when.status_f,
+        '0',
+        '/entities/0/fields/4/when/status_f/0',
+      ],
+    ],
+  ]
+
+  for (const [name, locate] of accessorCases) {
+    const doc = makeValidDoc()
+    const [owner, key, path] = locate(doc)
+    const original = owner[key]
+    let reads = 0
+    Object.defineProperty(owner, key, {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads++
+        if (name === 'top-level version') throw new Error('boom')
+        return original
+      },
+    })
+
+    const validated = validateFieldWeftDocV1(doc)
+    assert.equal(validated.ok, false, `${name} must be rejected by validation`)
+    assert.equal(errorWithCode(validated, 'input.unstable').path, path)
+
+    const canonical = readCanonicalFieldWeftDoc(doc)
+    assert.equal(canonical.ok, false, `${name} must be rejected by canonical read`)
+    assert.equal(errorWithCode(canonical, 'input.unstable').path, path)
+    assert.equal(reads, 0, `${name} getter must not be invoked`)
+  }
+
+  const sparse = makeValidDoc()
+  sparse.entities = new Array(1)
+  const sparseResult = validateFieldWeftDocV1(sparse)
+  assert.equal(errorWithCode(sparseResult, 'input.unstable').path, '/entities')
+
+  const nestedSparseCases = [
+    ['tags', (doc) => [doc.entities[0], 'tags', '/entities/0/tags']],
+    [
+      'collapsed',
+      (doc) => [doc.entities[0], 'collapsed', '/entities/0/collapsed'],
+    ],
+    [
+      'members',
+      (doc) => [doc.boundaries[0], 'members', '/boundaries/0/members'],
+    ],
+  ]
+  for (const [name, locate] of nestedSparseCases) {
+    const doc = makeValidDoc()
+    const [owner, key, path] = locate(doc)
+    owner[key] = new Array(1)
+
+    const validated = validateFieldWeftDocV1(doc)
+    assert.equal(
+      errorWithCode(validated, 'input.unstable').path,
+      path,
+      `sparse ${name} must report its containing array`,
+    )
+
+    const canonical = readCanonicalFieldWeftDoc(doc)
+    assert.equal(
+      errorWithCode(canonical, 'input.unstable').path,
+      path,
+      `canonical read must reject sparse ${name} at the same path`,
+    )
+  }
+}
+
+// Stability inspection follows only schema paths that validation consumes.
+{
+  const unknown = makeValidDoc()
+  let unknownOwnKeys = 0
+  unknown.unused = new Proxy(
+    { nested: new Array(200_000).fill({}) },
+    {
+      ownKeys() {
+        unknownOwnKeys++
+        throw new Error('unknown subtrees must not be inspected')
+      },
+    },
+  )
+  errorWithCode(validateFieldWeftDocV1(unknown), 'property.unknown')
+  errorWithCode(readCanonicalFieldWeftDoc(unknown), 'property.unknown')
+  assert.equal(unknownOwnKeys, 0)
+
+  const invalidContainer = makeValidDoc()
+  let invalidOwnKeys = 0
+  invalidContainer.entities = new Proxy(
+    { nested: new Array(200_000).fill({}) },
+    {
+      ownKeys() {
+        invalidOwnKeys++
+        throw new Error('invalid containers must not be inspected')
+      },
+    },
+  )
+  errorWithCode(validateFieldWeftDocV1(invalidContainer), 'type.array')
+  assert.equal(invalidOwnKeys, 0)
+}
+
+// Array methods and iteration hooks are outside the JSON array representation.
+{
+  const ownMap = makeValidDoc()
+  const fieldCount = ownMap.entities[0].fields.length
+  ownMap.entities[0].fields.map = () => []
+  const ownMapResult = readCanonicalFieldWeftDoc(ownMap)
+  assert.equal(ownMapResult.ok, true)
+  assert.equal(ownMapResult.doc.entities[0].fields.length, fieldCount)
+
+  class FieldArray extends Array {
+    map() {
+      throw new Error('array subclass map must not be invoked')
+    }
+  }
+  const subclass = makeValidDoc()
+  const subclassFields = new FieldArray()
+  for (const field of subclass.entities[0].fields) subclassFields.push(field)
+  subclass.entities[0].fields = subclassFields
+  const subclassResult = readCanonicalFieldWeftDoc(subclass)
+  assert.equal(subclassResult.ok, true)
+  assert.equal(subclassResult.doc.entities[0].fields.length, fieldCount)
+  assert.equal(Object.getPrototypeOf(subclassResult.doc.entities[0].fields), Array.prototype)
+
+  const iterator = makeValidDoc()
+  iterator.entities[0].tags = ['beta', 'alpha']
+  let iteratorReads = 0
+  Object.defineProperty(iterator.entities[0].tags, Symbol.iterator, {
+    enumerable: true,
+    configurable: true,
+    get() {
+      iteratorReads++
+      throw new Error('array iterator must not be observed')
+    },
+  })
+  const iteratorResult = readCanonicalFieldWeftDoc(iterator)
+  assert.equal(iteratorResult.ok, true)
+  assert.deepEqual(iteratorResult.doc.entities[0].tags, ['alpha', 'beta'])
+  assert.equal(iteratorReads, 0)
+}
+
+// Validation reads array elements by index instead of caller-controlled forEach.
+{
+  const when = makeValidDoc()
+  const whenValues = ['MISSING']
+  whenValues.forEach = (callback) => callback('OPEN', 0, whenValues)
+  when.entities[0].fields[4].when = { status_f: whenValues }
+  errorWithCode(validateFieldWeftDocV1(when), 'when.value')
+
+  const collapsed = makeValidDoc()
+  collapsed.entities[0].collapsed = ['missing_f']
+  collapsed.entities[0].collapsed.forEach = (callback) =>
+    callback('metadata_f', 0, collapsed.entities[0].collapsed)
+  errorWithCode(validateFieldWeftDocV1(collapsed), 'reference.collapsed')
+
+  const members = makeValidDoc()
+  members.boundaries[0].members = ['missing_node']
+  members.boundaries[0].members.forEach = (callback) =>
+    callback('order', 0, members.boundaries[0].members)
+  errorWithCode(validateFieldWeftDocV1(members), 'reference.boundary-member')
+}
+
+// Descriptor classification must not inherit a polluted `value` property.
+{
+  const source = JSON.stringify(makeValidDoc())
+  const pollutionCheck = spawnSync(
+    node,
+    [
+      '--input-type=module',
+      '--eval',
+      `
+        const { validateFieldWeftDocV1 } = await import('./dist/index.js')
+        const doc = ${source}
+        const id = doc.entities[0].id
+        let reads = 0
+        Object.defineProperty(doc.entities[0], 'id', {
+          enumerable: true,
+          configurable: true,
+          get() {
+            reads++
+            return id
+          },
+        })
+        Object.defineProperty(Object.prototype, 'value', {
+          value: 'polluted',
+          configurable: true,
+        })
+        const result = validateFieldWeftDocV1(doc)
+        if (result.ok || result.errors[0]?.code !== 'input.unstable') process.exit(2)
+        if (result.errors[0]?.path !== '/entities/0/id' || reads !== 0) process.exit(3)
+      `,
+    ],
+    { cwd: root, encoding: 'utf8' },
+  )
+  assert.equal(
+    pollutionCheck.status,
+    0,
+    pollutionCheck.stderr || pollutionCheck.stdout,
+  )
+}
+
+// Stable unsupported markers dispatch before v1-only structured-input checks.
+{
+  const unsupported = makeValidDoc()
+  unsupported.version = 2
+  let nestedReads = 0
+  Object.defineProperty(unsupported.entities[0], 'name', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      nestedReads++
+      throw new Error('unsupported document body must not be observed')
+    },
+  })
+  const dispatched = readFieldWeftDoc(unsupported)
+  assert.equal(dispatched.kind, 'unsupported')
+  assert.equal(dispatched.version, 2)
+  const canonical = readCanonicalFieldWeftDoc(unsupported)
+  assert.equal(errorWithCode(canonical, 'version.unsupported').params.actual, '2')
+  assert.equal(nestedReads, 0)
+
+  const sparse = makeValidDoc()
+  sparse.version = 3
+  sparse.entities = new Array(1)
+  assert.equal(readFieldWeftDoc(sparse).kind, 'unsupported')
+}
+
+// Function values are rejected by schema validation without recursive inspection.
+{
+  const topLevel = function () {}
+  let topLevelReads = 0
+  Object.defineProperty(topLevel, 'nested', {
+    enumerable: true,
+    get() {
+      topLevelReads++
+      throw new Error('function property must not be observed')
+    },
+  })
+  const topLevelResult = validateFieldWeftDocV1(topLevel)
+  assert.equal(errorWithCode(topLevelResult, 'type.object').path, '')
+  assert.equal(topLevelReads, 0)
+
+  const metadata = makeValidDoc()
+  const functionValue = function () {}
+  let metadataReads = 0
+  Object.defineProperty(functionValue, 'nested', {
+    enumerable: true,
+    get() {
+      metadataReads++
+      throw new Error('metadata function property must not be observed')
+    },
+  })
+  metadata.entities[0].meta = { callback: functionValue }
+  const metadataResult = validateFieldWeftDocV1(metadata)
+  assert.equal(
+    errorWithCode(metadataResult, 'meta.value-type').path,
+    '/entities/0/meta/callback',
+  )
+  assert.equal(metadataReads, 0)
+}
+
+// Proxy trap failures are absorbed, and post-canonical validation prevents an
+// unstable proxy read from producing an invalid successful result.
+{
+  const throwingProxy = new Proxy(makeValidDoc(), {
+    ownKeys() {
+      throw new Error('boom')
+    },
+  })
+  assert.equal(
+    errorWithCode(validateFieldWeftDocV1(throwingProxy), 'input.unstable').path,
+    '',
+  )
+  assert.equal(
+    errorWithCode(readCanonicalFieldWeftDoc(throwingProxy), 'input.unstable')
+      .path,
+    '',
+  )
+
+  const throwingGetProxy = new Proxy(makeValidDoc(), {
+    get(target, key, receiver) {
+      if (key === 'format') throw new Error('boom')
+      return Reflect.get(target, key, receiver)
+    },
+  })
+  assert.equal(
+    errorWithCode(validateFieldWeftDocV1(throwingGetProxy), 'input.unstable')
+      .path,
+    '',
+  )
+  const readResult = readFieldWeftDoc(throwingGetProxy)
+  assert.equal(readResult.kind, 'invalid')
+  assert.equal(readResult.errors[0].code, 'input.unstable')
+  assert.equal(readResult.errors[0].path, '')
+
+  const changing = makeValidDoc()
+  let idReads = 0
+  changing.entities[0] = new Proxy(changing.entities[0], {
+    get(target, key, receiver) {
+      if (key === 'id') {
+        idReads++
+        return idReads === 1 ? 'order' : '!'.repeat(500)
+      }
+      return Reflect.get(target, key, receiver)
+    },
+  })
+  const result = readCanonicalFieldWeftDoc(changing)
+  assert.equal(result.ok, false)
+  assert.ok(result.errors.some((error) => error.path === '/entities/0/id'))
+
+  const throwingDuringCanonicalization = makeValidDoc()
+  let canonicalIdReads = 0
+  throwingDuringCanonicalization.entities[0] = new Proxy(
+    throwingDuringCanonicalization.entities[0],
+    {
+      get(target, key, receiver) {
+        if (key === 'id' && ++canonicalIdReads > 1) {
+          throw new Error('boom')
+        }
+        return Reflect.get(target, key, receiver)
+      },
+    },
+  )
+  assert.equal(
+    errorWithCode(
+      readCanonicalFieldWeftDoc(throwingDuringCanonicalization),
+      'input.unstable',
+    ).path,
+    '',
+  )
 }
 
 // schema와 TypeScript validator는 공통 구조 fixture에서 같은 판정을 낸다.
@@ -809,11 +1177,12 @@ function addValidNodeRelation(doc, label) {
   errorWithCode(validateFieldWeftDocV1(reservedMapping), 'id.reserved')
 
   const deep = makeValidDoc()
-  let field = {
+  const beyondDepth = {
     id: `deep_${FIELD_WEFT_MAX_FIELD_DEPTH_V1 + 1}`,
     name: `deep_${FIELD_WEFT_MAX_FIELD_DEPTH_V1 + 1}`,
     type: 'object',
   }
+  let field = beyondDepth
   for (let depth = FIELD_WEFT_MAX_FIELD_DEPTH_V1; depth >= 1; depth--) {
     field = {
       id: `deep_${depth}`,
@@ -825,13 +1194,53 @@ function addValidNodeRelation(doc, label) {
   deep.entities[0].fields = [field]
   deep.entities[0].collapsed = []
   deep.mappings = []
+  let beyondDepthReads = 0
+  Object.defineProperty(beyondDepth, 'id', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      beyondDepthReads++
+      throw new Error('fields beyond the depth limit must not be inspected')
+    },
+  })
   errorWithCode(validateFieldWeftDocV1(deep), 'limit.field-depth')
+  assert.equal(beyondDepthReads, 0)
 
   const tooMany = makeValidDoc()
   tooMany.entities[0].fields = new Array(FIELD_WEFT_MAX_FIELDS_V1 + 1)
+  let excessFieldReads = 0
+  Object.defineProperty(tooMany.entities[0].fields, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      excessFieldReads++
+      throw new Error('fields beyond the count limit must not be inspected')
+    },
+  })
   tooMany.entities[0].collapsed = []
   tooMany.mappings = []
   errorWithCode(validateFieldWeftDocV1(tooMany), 'limit.fields')
+  assert.equal(excessFieldReads, 0)
+
+  const tooManyMetaEntries = makeValidDoc()
+  tooManyMetaEntries.entities[0].meta = {}
+  for (let index = 0; index < FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1; index++) {
+    tooManyMetaEntries.entities[0].meta[`key_${index}`] = index
+  }
+  let excessMetaReads = 0
+  Object.defineProperty(tooManyMetaEntries.entities[0].meta, 'excess', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      excessMetaReads++
+      throw new Error('metadata beyond the entry limit must not be inspected')
+    },
+  })
+  errorWithCode(
+    validateFieldWeftDocV1(tooManyMetaEntries),
+    'limit.meta-per-object',
+  )
+  assert.equal(excessMetaReads, 0)
 }
 
 // node relation은 구조·endpoint·self 관계와 mapping을 합친 ID 공간을 검증한다.

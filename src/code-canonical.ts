@@ -25,8 +25,23 @@ import {
 } from './code-layout.js'
 import { getOwnEnumerableProperty } from './code-property.js'
 
+function mapArray<Input, Output>(
+  values: readonly Input[],
+  map: (value: Input, index: number) => Output,
+): Output[] {
+  const out = new Array<Output>(values.length)
+  for (let index = 0; index < values.length; index++) {
+    out[index] = map(values[index], index)
+  }
+  return out
+}
+
+function copyArray<Value>(values: readonly Value[]): Value[] {
+  return mapArray(values, (value) => value)
+}
+
 function sorted(values: readonly string[]): string[] {
-  return [...values].sort()
+  return copyArray(values).sort()
 }
 
 function canonicalMeta(meta: FieldWeftMetadataV1): FieldWeftMetadataV1 | undefined {
@@ -78,9 +93,9 @@ function canonicalField(field: FieldWeftFieldV1): FieldWeftFieldV1 {
   if (getOwnEnumerableProperty(field, 'array') === true) out.array = true
   if (getOwnEnumerableProperty(field, 'nullable') === true) out.nullable = true
   if (getOwnEnumerableProperty(field, 'pk') === true) out.pk = true
-  if (children?.length) out.children = children.map(canonicalField)
+  if (children?.length) out.children = mapArray(children, canonicalField)
   if (discriminator) {
-    out.discriminator = { values: [...discriminator.values] }
+    out.discriminator = { values: copyArray(discriminator.values) }
   }
   if (inputWhen) {
     const when = canonicalWhen(inputWhen)
@@ -102,7 +117,7 @@ function canonicalEntity(
     kind: entity.kind,
     ...canonicalAnnotationProps(entity),
     position: { x: position.x, y: position.y },
-    fields: entity.fields.map(canonicalField),
+    fields: mapArray(entity.fields, canonicalField),
   }
   if (collapsed?.length) out.collapsed = sorted(collapsed)
   return out
@@ -120,8 +135,8 @@ function canonicalProcess(
     kind: process.kind,
     ...canonicalAnnotationProps(process),
     position: { x: position.x, y: position.y },
-    inputs: process.inputs.map(canonicalField),
-    outputs: process.outputs.map(canonicalField),
+    inputs: mapArray(process.inputs, canonicalField),
+    outputs: mapArray(process.outputs, canonicalField),
   }
   return out
 }
@@ -181,11 +196,11 @@ export function canonicalizeFieldWeftDoc(doc: ValidFieldWeftDocV1): CanonicalFie
   return {
     format: FIELD_WEFT_FORMAT,
     version: FIELD_WEFT_VERSION_V1,
-    entities: doc.entities.map(canonicalEntity),
-    processes: doc.processes.map(canonicalProcess),
-    boundaries: doc.boundaries.map(canonicalBoundary),
-    nodeRelations: doc.nodeRelations.map(canonicalNodeRelation),
-    mappings: doc.mappings.map(canonicalMapping),
+    entities: mapArray(doc.entities, canonicalEntity),
+    processes: mapArray(doc.processes, canonicalProcess),
+    boundaries: mapArray(doc.boundaries, canonicalBoundary),
+    nodeRelations: mapArray(doc.nodeRelations, canonicalNodeRelation),
+    mappings: mapArray(doc.mappings, canonicalMapping),
   } as CanonicalFieldWeftDocV1
 }
 
@@ -195,33 +210,33 @@ export function projectSemanticFieldWeftDoc(
   return {
     format: FIELD_WEFT_FORMAT,
     version: FIELD_WEFT_VERSION_V1,
-    entities: doc.entities.map((entity) => ({
+    entities: mapArray(doc.entities, (entity) => ({
       id: entity.id,
       name: entity.name,
       kind: entity.kind,
       ...canonicalAnnotationProps(entity),
-      fields: entity.fields.map(canonicalField),
+      fields: mapArray(entity.fields, canonicalField),
     })),
-    processes: doc.processes.map((process) => ({
+    processes: mapArray(doc.processes, (process) => ({
       id: process.id,
       name: process.name,
       kind: process.kind,
       ...canonicalAnnotationProps(process),
-      inputs: process.inputs.map(canonicalField),
-      outputs: process.outputs.map(canonicalField),
+      inputs: mapArray(process.inputs, canonicalField),
+      outputs: mapArray(process.outputs, canonicalField),
     })),
-    boundaries: doc.boundaries.map((boundary) => {
+    boundaries: mapArray(doc.boundaries, (boundary) => {
       const out: FieldWeftSemanticProjectionV1['boundaries'][number] = {
         id: boundary.id,
         name: boundary.name,
         ...canonicalAnnotationProps(boundary),
       }
       if (boundary.kind) out.kind = boundary.kind
-      if (boundary.members?.length) out.members = [...boundary.members]
+      if (boundary.members?.length) out.members = copyArray(boundary.members)
       return out
     }),
-    nodeRelations: doc.nodeRelations.map(canonicalNodeRelation),
-    mappings: doc.mappings.map(canonicalMapping),
+    nodeRelations: mapArray(doc.nodeRelations, canonicalNodeRelation),
+    mappings: mapArray(doc.mappings, canonicalMapping),
   }
 }
 
@@ -229,16 +244,16 @@ export function projectLayoutFieldWeftDoc(doc: CanonicalFieldWeftDocV1): FieldWe
   return {
     format: FIELD_WEFT_FORMAT,
     version: FIELD_WEFT_VERSION_V1,
-    entities: doc.entities.map((entity) => ({
+    entities: mapArray(doc.entities, (entity) => ({
       id: entity.id,
       position: { x: entity.position.x, y: entity.position.y },
-      ...(entity.collapsed?.length ? { collapsed: [...entity.collapsed] } : {}),
+      ...(entity.collapsed?.length ? { collapsed: copyArray(entity.collapsed) } : {}),
     })),
-    processes: doc.processes.map((process) => ({
+    processes: mapArray(doc.processes, (process) => ({
       id: process.id,
       position: { x: process.position.x, y: process.position.y },
     })),
-    boundaries: doc.boundaries.map((boundary) => ({
+    boundaries: mapArray(doc.boundaries, (boundary) => ({
       id: boundary.id,
       position: { x: boundary.position.x, y: boundary.position.y },
       size: { width: boundary.size.width, height: boundary.size.height },
