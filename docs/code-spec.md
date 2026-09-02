@@ -65,9 +65,14 @@ types, or collection elements skipped after a resource limit is reached.
 Those inputs receive the applicable property, type, or limit diagnostic
 without traversing the discarded subtree.
 
-Structured-input rejection reports one `input.unstable` diagnostic and no
-other diagnostics. When multiple unstable locations exist, which location
-determines the diagnostic path is unspecified.
+Validation also stops consuming schema paths and collection entries after its
+diagnostic budget is exhausted. Accessors, sparse elements, and Proxy failures
+on that skipped remainder are not inspected.
+
+An unstable value encountered on a consumed path before that termination
+replaces accumulated errors with one `input.unstable` diagnostic and no other
+diagnostics. When multiple unstable locations exist, which location determines
+the diagnostic path is unspecified.
 
 Arrays are consumed through their `length` and own indexed data properties
 within the ranges validation reads. Own non-index string properties and symbol
@@ -433,6 +438,7 @@ document.
 - boundary width and height: a safe integer in `1..10,000,000`
 - raw JSON source: at most 16 × 1024 × 1024 UTF-8 bytes
 - canonical FieldWeft document: at most 8 × 1024 × 1024 compact UTF-8 bytes
+- top-level diagnostics returned by one validation: at most 1,000
 
 String lengths are counted in Unicode code points, not UTF-16 code units or
 UTF-8 bytes. Input exceeding a limit is rejected rather than truncated. The
@@ -440,6 +446,20 @@ raw source byte gate runs before JSON parsing; object, string, and aggregate
 limits run after parsing; and the canonical byte gate runs after default
 layout, ordering, and omission rules have been applied. The URL share codec
 adds separate, smaller transport limits.
+
+`FIELD_WEFT_MAX_DIAGNOSTICS_V1` is 1,000. If another diagnostic would exceed
+that budget, the returned list contains at most 999 ordinary diagnostics and
+ends with one error whose `code` is `diagnostics.truncated`, whose `path` is
+the empty JSON Pointer, and whose `params` is `{ "limit": 1000 }`. Its message
+is `Additional diagnostics were omitted after reaching the limit.` The marker
+does not report an exact omitted count. A diagnostic's `related` locations
+remain attached to their owning top-level diagnostic and do not consume
+additional slots.
+
+The marker means that the complete input is still rejected and only the list
+of causes is truncated; it is not an input repair or acceptance rule. After
+emitting it, validation stops remaining traversal and deferred checks that
+cannot change the invalid result.
 
 ## v1 support and the v2 boundary extension path
 

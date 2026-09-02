@@ -86,6 +86,12 @@ is a document contract; the 8 MiB packed limit and 256 KiB token limit are share
 transport contracts. See the specification's
 [Resource limits](code-spec.md#resource-limits) for exact document limits.
 
+The validator may bound the returned cause list with a final
+`diagnostics.truncated` marker, but it never truncates the input itself or
+accepts a partial document. Such a share result remains `invalid` with the
+bounded diagnostics. If a substantive `limit.*` diagnostic was emitted before
+validation stopped, the existing `too-large` result still applies.
+
 ## Receiving and failure behavior
 
 A receiver base64url-decodes and streaming-inflates the token within the

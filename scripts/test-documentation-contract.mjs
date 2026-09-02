@@ -129,6 +129,9 @@ requireStatements('docs/code-spec.md', [
   'Removing or renaming either a diagnostic `code` or a diagnostic `params` key, or changing the meaning of either, requires a major release.',
   'Consumers must tolerate unrecognized diagnostic `code` values and handle them generically using `severity`, `path`, and `message`.',
   'Consumers must ignore unrecognized diagnostic `params` keys.',
+  '`FIELD_WEFT_MAX_DIAGNOSTICS_V1` is 1,000.',
+  'ends with one error whose `code` is `diagnostics.truncated`',
+  'The marker means that the complete input is still rejected and only the list of causes is truncated',
 ])
 
 requireStatements('docs/ko/code-spec.md', [
@@ -141,6 +144,21 @@ requireStatements('docs/ko/code-spec.md', [
   'diagnostic `code` 또는 `params` key를 제거·rename하거나 의미를 바꾸는 경우에는 major release가 필요하다.',
   '소비자는 알 수 없는 diagnostic `code`를 허용하고 `severity`, `path`, `message`를 사용해 일반 진단으로 처리해야 한다.',
   '소비자는 알 수 없는 diagnostic `params` key를 무시해야 한다.',
+  '`FIELD_WEFT_MAX_DIAGNOSTICS_V1`은 1,000이다.',
+  '`diagnostics.truncated` code와 `{ "limit": 1000 }` params를 가진 marker 하나로 끝난다.',
+  '전체 입력이 여전히 거부되고 원인 목록만 잘렸다는 뜻',
+])
+
+requireStatements('docs/fieldweft-sharing-guide.md', [
+  'The validator may bound the returned cause list with a final `diagnostics.truncated` marker, but it never truncates the input itself or accepts a partial document.',
+  'Such a share result remains `invalid` with the bounded diagnostics.',
+  'the existing `too-large` result still applies.',
+])
+
+requireStatements('docs/ko/fieldweft-sharing-guide.md', [
+  'validator는 반환하는 원인 목록을 마지막 `diagnostics.truncated` marker로 제한할 수 있지만 입력 자체를 자르거나 일부 문서를 받아들이지 않는다.',
+  '이런 share 결과는 제한된 diagnostics를 유지한 `invalid`다.',
+  '기존 `too-large` 결과를 그대로 적용한다.',
 ])
 
 for (const relativePath of [
