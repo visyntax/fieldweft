@@ -18,6 +18,8 @@ export const FIELD_WEFT_MAX_RELATIONS_V1 = 20_000
 export const FIELD_WEFT_MAX_FIELDS_V1 = 100_000
 export const FIELD_WEFT_MAX_FIELD_DEPTH_V1 = 64
 export const FIELD_WEFT_MAX_COORD_V1 = 10_000_000
+/** Maximum top-level diagnostics returned by one FieldWeft v1 validation. */
+export const FIELD_WEFT_MAX_DIAGNOSTICS_V1 = 1_000
 
 /**
  * Shared defensive budgets for FieldWeft v1 document processing.

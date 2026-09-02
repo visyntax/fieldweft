@@ -26,6 +26,7 @@ const {
   FIELD_WEFT_FIELD_TYPES_V1,
   FIELD_WEFT_MAPPING_KINDS_V1,
   FIELD_WEFT_MAX_DESCRIPTION_CHARS_V1,
+  FIELD_WEFT_MAX_DIAGNOSTICS_V1,
   FIELD_WEFT_MAX_FIELD_DEPTH_V1,
   FIELD_WEFT_MAX_FIELDS_V1,
   FIELD_WEFT_MAX_ID_CHARS_V1,
@@ -636,6 +637,149 @@ function addValidNodeRelation(doc, label) {
   )
   errorWithCode(validateFieldWeftDocV1(invalidContainer), 'type.array')
   assert.equal(invalidOwnKeys, 0)
+}
+
+// One validation operation returns a bounded deterministic diagnostic prefix.
+{
+  const emptyDoc = () => ({
+    format: 'fieldweft',
+    version: 1,
+    entities: [],
+    processes: [],
+    boundaries: [],
+    nodeRelations: [],
+    mappings: [],
+  })
+  const truncationMarker = {
+    code: 'diagnostics.truncated',
+    path: '',
+    severity: 'error',
+    message: 'Additional diagnostics were omitted after reaching the limit.',
+    params: { limit: FIELD_WEFT_MAX_DIAGNOSTICS_V1 },
+  }
+
+  const small = emptyDoc()
+  small.extra = true
+  const smallResult = validateFieldWeftDocV1(small)
+  assert.equal(smallResult.ok, false)
+  assert.deepEqual(
+    smallResult.errors.map(({ code, path }) => ({ code, path })),
+    [{ code: 'property.unknown', path: '/extra' }],
+  )
+
+  const propertyHeavy = emptyDoc()
+  for (let index = 0; index < FIELD_WEFT_MAX_DIAGNOSTICS_V1 + 50; index++) {
+    propertyHeavy[`x${index}`] = true
+  }
+  const propertyResult = validateFieldWeftDocV1(propertyHeavy)
+  assert.equal(propertyResult.ok, false)
+  assert.equal(propertyResult.errors.length, FIELD_WEFT_MAX_DIAGNOSTICS_V1)
+  assert.equal(propertyResult.errors[0].path, '/x0')
+  assert.equal(
+    propertyResult.errors.at(-2).path,
+    `/x${FIELD_WEFT_MAX_DIAGNOSTICS_V1 - 2}`,
+  )
+  assert.deepEqual(propertyResult.errors.at(-1), truncationMarker)
+
+  const readResult = readFieldWeftDoc(propertyHeavy)
+  assert.equal(readResult.kind, 'invalid')
+  assert.deepEqual(readResult.errors, propertyResult.errors)
+  const canonicalResult = readCanonicalFieldWeftDoc(propertyHeavy)
+  assert.equal(canonicalResult.ok, false)
+  assert.deepEqual(canonicalResult.errors, propertyResult.errors)
+
+  let lateDescriptorReads = 0
+  let ownKeyReads = 0
+  const lateUnstableTarget = emptyDoc()
+  for (let index = 0; index < FIELD_WEFT_MAX_DIAGNOSTICS_V1; index++) {
+    lateUnstableTarget[`x${index}`] = true
+  }
+  Object.defineProperty(lateUnstableTarget, 'late', {
+    enumerable: true,
+    get() {
+      throw new Error('late accessors must remain unobserved')
+    },
+  })
+  const lateUnstable = new Proxy(lateUnstableTarget, {
+    ownKeys(target) {
+      ownKeyReads++
+      return Reflect.ownKeys(target)
+    },
+    getOwnPropertyDescriptor(target, key) {
+      lateDescriptorReads++
+      return Reflect.getOwnPropertyDescriptor(target, key)
+    },
+  })
+  const lateResult = validateFieldWeftDocV1(lateUnstable)
+  assert.equal(lateResult.ok, false)
+  assert.deepEqual(lateResult.errors.at(-1), truncationMarker)
+  assert.equal(ownKeyReads, 1)
+  assert.equal(
+    lateDescriptorReads,
+    7 + FIELD_WEFT_MAX_DIAGNOSTICS_V1,
+  )
+
+  const earlyUnstable = emptyDoc()
+  for (let index = 0; index < 10; index++) earlyUnstable[`x${index}`] = true
+  Object.defineProperty(earlyUnstable, 'unstable', {
+    enumerable: true,
+    get() {
+      throw new Error('unstable accessors must not be invoked')
+    },
+  })
+  for (let index = 10; index < FIELD_WEFT_MAX_DIAGNOSTICS_V1; index++) {
+    earlyUnstable[`x${index}`] = true
+  }
+  const earlyResult = validateFieldWeftDocV1(earlyUnstable)
+  assert.equal(earlyResult.ok, false)
+  assert.deepEqual(earlyResult.errors, [
+    {
+      code: 'input.unstable',
+      path: '/unstable',
+      severity: 'error',
+      message:
+        'Structured input must use stable own data properties and dense arrays.',
+    },
+  ])
+
+  let deferredOwnKeys = 0
+  const deferredWhen = new Proxy(
+    { missing_discriminator: ['value'] },
+    {
+      ownKeys(target) {
+        deferredOwnKeys++
+        if (deferredOwnKeys > 1) {
+          throw new Error('deferred reference checks must not run')
+        }
+        return Reflect.ownKeys(target)
+      },
+    },
+  )
+  const invalidFields = Array.from(
+    { length: FIELD_WEFT_MAX_FIELDS_V1 - 1 },
+    () => ({}),
+  )
+  invalidFields.unshift({
+    id: 'conditional',
+    name: 'conditional',
+    type: 'string',
+    when: deferredWhen,
+  })
+  const fieldHeavy = emptyDoc()
+  fieldHeavy.entities = [
+    { id: 'entity', name: 'Entity', kind: 'db', fields: invalidFields },
+  ]
+  const fieldResult = validateFieldWeftDocV1(fieldHeavy)
+  assert.equal(fieldResult.ok, false)
+  assert.equal(fieldResult.errors.length, FIELD_WEFT_MAX_DIAGNOSTICS_V1)
+  assert.deepEqual(fieldResult.errors.at(-1), truncationMarker)
+  assert.equal(deferredOwnKeys, 1)
+  invalidFields[0].when = { missing_discriminator: ['value'] }
+  const repeatedFieldResult = validateFieldWeftDocV1(fieldHeavy)
+  assert.deepEqual(
+    validateFieldWeftDocV1(fieldHeavy).errors,
+    repeatedFieldResult.errors,
+  )
 }
 
 // Array methods and iteration hooks are outside the JSON array representation.

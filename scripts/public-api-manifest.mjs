@@ -140,7 +140,7 @@ export const webOwnedExports = [
 
 export const publicApiReview = {
   status: 'approved',
-  approvedAt: '2026-07-29',
+  approvedAt: '2026-09-02',
   reviewItems: [],
 }
 
@@ -261,6 +261,14 @@ export const publicApiManifest = [
   ),
   ...manualV1Values.map(([name, sourceName]) =>
     api(name, 'value', 'v1', modelSource, [sourceName]),
+  ),
+  api(
+    'FIELD_WEFT_MAX_DIAGNOSTICS_V1',
+    'value',
+    'v1',
+    modelSource,
+    [],
+    'No historical fieldweft-web alias.',
   ),
   api(
     'FIELD_WEFT_RESERVED_IDS',

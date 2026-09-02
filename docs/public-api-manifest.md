@@ -1,6 +1,6 @@
 # Public API Manifest
 
-> **Status:** Approved on 2026-07-29.
+> **Status:** Approved on 2026-09-02.
 > **Language:** This English manifest is normative. Korean documentation is
 > non-normative commentary; English takes precedence if the two differ.
 > Names in the “Current source names” column classify the extraction source.
@@ -126,6 +126,7 @@
 | `FIELD_WEFT_MAX_TOTAL_TAGS_V1` | value | `v1` | `MAX_CODEDOC_TAGS` | `MAX_CODEDOC_TAGS` | — |
 | `FIELD_WEFT_MAX_TOTAL_META_ENTRIES_V1` | value | `v1` | `MAX_CODEDOC_META_ENTRIES` | `MAX_CODEDOC_META_ENTRIES` | — |
 | `FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1` | value | `v1` | `MAX_CODEDOC_ANNOTATION_CODEPOINTS` | `MAX_CODEDOC_ANNOTATION_CODEPOINTS` | — |
+| `FIELD_WEFT_MAX_DIAGNOSTICS_V1` | value | `v1` | — | — | No historical fieldweft-web alias. |
 | `FIELD_WEFT_RESERVED_IDS` | value | `global` | `RESERVED_FIELDWEFT_IDS` | `RESERVED_FIELDWEFT_IDS` | Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics. |
 | `FIELD_WEFT_RESERVED_META_KEYS` | value | `global` | `RESERVED_FIELDWEFT_META_KEYS` | `RESERVED_FIELDWEFT_META_KEYS` | Immutable `ReadonlySet` facade, not a `Set` instance; use `new Set(value)` for ordinary or cloneable `Set` semantics. |
 | `FIELD_WEFT_RESERVED_META_PREFIX` | value | `global` | `RESERVED_FIELDWEFT_META_PREFIX` | `RESERVED_FIELDWEFT_META_PREFIX` | — |

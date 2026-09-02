@@ -21,6 +21,7 @@ import {
 } from './fieldweft-v1.generated.js'
 import {
   FIELD_WEFT_MAX_FIELD_DEPTH_V1,
+  FIELD_WEFT_MAX_DIAGNOSTICS_V1,
   FIELD_WEFT_MAX_FIELDS_V1,
   FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1,
   FIELD_WEFT_MAX_TOTAL_META_ENTRIES_V1,
@@ -284,6 +285,15 @@ class UnstableStructuredInputError extends Error {
   }
 }
 
+class DiagnosticBudgetExhaustedError extends Error {
+  readonly errors: FieldWeftDiagnostic[]
+
+  constructor(errors: FieldWeftDiagnostic[]) {
+    super('FieldWeft diagnostic budget exhausted.')
+    this.errors = errors
+  }
+}
+
 type StructuredMarker =
   | { kind: 'absent' }
   | { kind: 'data'; value: unknown }
@@ -321,23 +331,30 @@ function arrayValue(value: unknown[], index: number, path: string): unknown {
   return descriptor.value
 }
 
-function ownDataEntries(
+function* ownEnumerableDescriptors(
   value: RecordValue,
   path: string,
-): Array<[string, unknown]> {
-  const entries: Array<[string, unknown]> = []
+): Generator<[string, PropertyDescriptor]> {
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string') continue
     const descriptor = Reflect.getOwnPropertyDescriptor(value, key)
     const keyPath = childPath(path, key)
     if (!descriptor) throw new UnstableStructuredInputError(keyPath)
     if (!descriptor.enumerable) continue
-    if (!Object.hasOwn(descriptor, 'value')) {
-      throw new UnstableStructuredInputError(keyPath)
-    }
-    entries.push([key, descriptor.value])
+    yield [key, descriptor]
   }
-  return entries
+}
+
+function* ownDataEntries(
+  value: RecordValue,
+  path: string,
+): Generator<[string, unknown]> {
+  for (const [key, descriptor] of ownEnumerableDescriptors(value, path)) {
+    if (!Object.hasOwn(descriptor, 'value')) {
+      throw new UnstableStructuredInputError(childPath(path, key))
+    }
+    yield [key, descriptor.value]
+  }
 }
 
 function unstableStructuredInputDiagnostic(
@@ -360,6 +377,16 @@ function addError(
   params?: FieldWeftDiagnostic['params'],
   related?: FieldWeftDiagnosticRelated[],
 ): void {
+  if (state.errors.length >= FIELD_WEFT_MAX_DIAGNOSTICS_V1 - 1) {
+    state.errors.push({
+      code: 'diagnostics.truncated',
+      path: '',
+      severity: 'error',
+      message: 'Additional diagnostics were omitted after reaching the limit.',
+      params: { limit: FIELD_WEFT_MAX_DIAGNOSTICS_V1 },
+    })
+    throw new DiagnosticBudgetExhaustedError(state.errors)
+  }
   state.errors.push({
     code,
     path,
@@ -593,20 +620,27 @@ function validateAnnotations(
     )
     return
   }
-  const keys = Object.keys(value.meta)
-  if (keys.length > FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1) {
-    addError(
-      state,
-      'limit.meta-per-object',
-      childPath(metaPath, keys[FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1]),
-      `An object must not contain more than ${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1} metadata entries.`,
-      { limit: FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 },
-    )
-  }
-  const count = Math.min(keys.length, FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1)
-  for (let index = 0; index < count; index++) {
-    const key = keys[index]
+  let entryIndex = 0
+  for (const [key, descriptor] of ownEnumerableDescriptors(
+    value.meta,
+    metaPath,
+  )) {
     const keyPath = childPath(metaPath, key)
+    if (entryIndex >= FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1) {
+      addError(
+        state,
+        'limit.meta-per-object',
+        keyPath,
+        `An object must not contain more than ${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1} metadata entries.`,
+        { limit: FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 },
+      )
+      break
+    }
+    entryIndex++
+    if (!Object.hasOwn(descriptor, 'value')) {
+      throw new UnstableStructuredInputError(keyPath)
+    }
+    const metaValue = descriptor.value
     if (state.metaEntryCount >= FIELD_WEFT_MAX_TOTAL_META_ENTRIES_V1) {
       if (!state.metaLimitReported) {
         state.metaLimitReported = true
@@ -651,7 +685,6 @@ function validateAnnotations(
       consumeAnnotationCodePoints(key, keyPath, state)
     }
 
-    const metaValue = ownDataValue(value.meta, key, keyPath)
     if (typeof metaValue === 'string') {
       if (
         checkStringLimit(
@@ -1747,6 +1780,9 @@ export function validateFieldWeftDocV1(
   try {
     return validateStableFieldWeftDocV1(input)
   } catch (error) {
+    if (error instanceof DiagnosticBudgetExhaustedError) {
+      return { ok: false, errors: error.errors }
+    }
     return {
       ok: false,
       errors: [
@@ -1790,6 +1826,9 @@ export function readFieldWeftDoc(input: unknown): ReadFieldWeftDocResult {
       ? { kind: 'ok', doc: result.doc }
       : { kind: 'invalid', errors: result.errors }
   } catch (error) {
+    if (error instanceof DiagnosticBudgetExhaustedError) {
+      return { kind: 'invalid', errors: error.errors }
+    }
     return {
       kind: 'invalid',
       errors: [

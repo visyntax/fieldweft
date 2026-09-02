@@ -13,6 +13,7 @@ const {
   FIELD_WEFT_MAPPING_KINDS_V1,
   FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1,
   FIELD_WEFT_MAX_DESCRIPTION_CHARS_V1,
+  FIELD_WEFT_MAX_DIAGNOSTICS_V1,
   FIELD_WEFT_MAX_FIELD_DEPTH_V1,
   FIELD_WEFT_MAX_LABEL_CHARS_V1,
   FIELD_WEFT_MAX_NODES_V1,
@@ -254,6 +255,21 @@ function tokenFromJson(value) {
   assert.deepEqual(await encodeFieldWeftShare(oversizedAnnotations), {
     kind: 'too-large',
     limit: 'FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1',
+  })
+
+  const manyUnknownProperties = structuredClone(golden.document)
+  for (let index = 0; index < FIELD_WEFT_MAX_DIAGNOSTICS_V1 + 50; index++) {
+    manyUnknownProperties[`x${index}`] = true
+  }
+  const truncated = await encodeFieldWeftShare(manyUnknownProperties)
+  assert.equal(truncated.kind, 'invalid')
+  assert.equal(truncated.diagnostics.length, FIELD_WEFT_MAX_DIAGNOSTICS_V1)
+  assert.deepEqual(truncated.diagnostics.at(-1), {
+    code: 'diagnostics.truncated',
+    path: '',
+    severity: 'error',
+    message: 'Additional diagnostics were omitted after reaching the limit.',
+    params: { limit: FIELD_WEFT_MAX_DIAGNOSTICS_V1 },
   })
 }
 
