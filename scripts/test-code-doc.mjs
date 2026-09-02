@@ -667,10 +667,32 @@ function addValidNodeRelation(doc, label) {
     [{ code: 'property.unknown', path: '/extra' }],
   )
 
-  const propertyHeavy = emptyDoc()
-  for (let index = 0; index < FIELD_WEFT_MAX_DIAGNOSTICS_V1 + 50; index++) {
-    propertyHeavy[`x${index}`] = true
+  const unknownPropertyDoc = (count) => {
+    const doc = emptyDoc()
+    for (let index = 0; index < count; index++) doc[`x${index}`] = true
+    return doc
   }
+
+  const belowBudgetResult = validateFieldWeftDocV1(
+    unknownPropertyDoc(FIELD_WEFT_MAX_DIAGNOSTICS_V1 - 1),
+  )
+  assert.equal(belowBudgetResult.ok, false)
+  assert.equal(
+    belowBudgetResult.errors.length,
+    FIELD_WEFT_MAX_DIAGNOSTICS_V1 - 1,
+  )
+  assert.equal(
+    belowBudgetResult.errors.at(-1).path,
+    `/x${FIELD_WEFT_MAX_DIAGNOSTICS_V1 - 2}`,
+  )
+  assert.equal(
+    belowBudgetResult.errors.some(
+      ({ code }) => code === 'diagnostics.truncated',
+    ),
+    false,
+  )
+
+  const propertyHeavy = unknownPropertyDoc(FIELD_WEFT_MAX_DIAGNOSTICS_V1)
   const propertyResult = validateFieldWeftDocV1(propertyHeavy)
   assert.equal(propertyResult.ok, false)
   assert.equal(propertyResult.errors.length, FIELD_WEFT_MAX_DIAGNOSTICS_V1)

@@ -130,7 +130,8 @@ requireStatements('docs/code-spec.md', [
   'Consumers must tolerate unrecognized diagnostic `code` values and handle them generically using `severity`, `path`, and `message`.',
   'Consumers must ignore unrecognized diagnostic `params` keys.',
   '`FIELD_WEFT_MAX_DIAGNOSTICS_V1` is 1,000.',
-  'ends with one error whose `code` is `diagnostics.truncated`',
+  'When validation attempts to emit the 1,000th ordinary diagnostic, it emits `diagnostics.truncated` in that final slot instead.',
+  'A result with at most 999 ordinary diagnostics returns all of them; a result with 1,000 or more causes contains 999 ordinary diagnostics followed by the marker.',
   'The marker means that the complete input is still rejected and only the list of causes is truncated',
 ])
 
@@ -145,8 +146,17 @@ requireStatements('docs/ko/code-spec.md', [
   '소비자는 알 수 없는 diagnostic `code`를 허용하고 `severity`, `path`, `message`를 사용해 일반 진단으로 처리해야 한다.',
   '소비자는 알 수 없는 diagnostic `params` key를 무시해야 한다.',
   '`FIELD_WEFT_MAX_DIAGNOSTICS_V1`은 1,000이다.',
-  '`diagnostics.truncated` code와 `{ "limit": 1000 }` params를 가진 marker 하나로 끝난다.',
+  'validation이 1,000번째 일반 diagnostic을 내려고 하면 마지막 slot에는 그 diagnostic 대신 `diagnostics.truncated` marker를 낸다.',
+  '일반 diagnostic이 999개 이하면 모두 반환하고, 원인이 1,000개 이상이면 일반 diagnostic 999개 뒤에 marker를 붙여 반환한다.',
   '전체 입력이 여전히 거부되고 원인 목록만 잘렸다는 뜻',
+])
+
+forbidStatements('docs/code-spec.md', [
+  'If another diagnostic would exceed that budget',
+])
+
+forbidStatements('docs/ko/code-spec.md', [
+  '다음 diagnostic이 이 예산을 넘기게 되면',
 ])
 
 requireStatements('docs/fieldweft-sharing-guide.md', [

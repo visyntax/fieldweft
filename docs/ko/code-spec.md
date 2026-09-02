@@ -366,9 +366,10 @@ vendor payload, 원본 SQL·소스 코드, 실제 데이터 값이나 원본 lin
 검사는 parse 뒤에, canonical byte gate는 기본 layout과 정렬·생략을 적용한 뒤에 실행한다. URL
 공유 codec은 별도의 더 작은 transport 한도를 추가로 적용한다.
 
-`FIELD_WEFT_MAX_DIAGNOSTICS_V1`은 1,000이다. 다음 diagnostic이 이 예산을 넘기게 되면 반환 목록은
-일반 diagnostic을 최대 999개 포함하고, 빈 JSON Pointer `path`, `error` severity,
-`diagnostics.truncated` code와 `{ "limit": 1000 }` params를 가진 marker 하나로 끝난다. 메시지는
+`FIELD_WEFT_MAX_DIAGNOSTICS_V1`은 1,000이다. validation이 1,000번째 일반 diagnostic을 내려고 하면
+마지막 slot에는 그 diagnostic 대신 `diagnostics.truncated` marker를 낸다. 일반 diagnostic이 999개
+이하면 모두 반환하고, 원인이 1,000개 이상이면 일반 diagnostic 999개 뒤에 marker를 붙여 반환한다.
+marker는 `error` severity, 빈 JSON Pointer `path`, `{ "limit": 1000 }` params를 가진다. 메시지는
 `Additional diagnostics were omitted after reaching the limit.`이다. marker는 생략된 수를 정확히
 보고하지 않는다. diagnostic의 `related` location은 소유 diagnostic에 붙어 있으며 별도 slot을
 소비하지 않는다.

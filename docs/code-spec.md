@@ -447,11 +447,13 @@ limits run after parsing; and the canonical byte gate runs after default
 layout, ordering, and omission rules have been applied. The URL share codec
 adds separate, smaller transport limits.
 
-`FIELD_WEFT_MAX_DIAGNOSTICS_V1` is 1,000. If another diagnostic would exceed
-that budget, the returned list contains at most 999 ordinary diagnostics and
-ends with one error whose `code` is `diagnostics.truncated`, whose `path` is
-the empty JSON Pointer, and whose `params` is `{ "limit": 1000 }`. Its message
-is `Additional diagnostics were omitted after reaching the limit.` The marker
+`FIELD_WEFT_MAX_DIAGNOSTICS_V1` is 1,000. When validation attempts to emit the
+1,000th ordinary diagnostic, it emits `diagnostics.truncated` in that final
+slot instead. A result with at most 999 ordinary diagnostics returns all of
+them; a result with 1,000 or more causes contains 999 ordinary diagnostics
+followed by the marker. The marker has `error` severity, the empty JSON Pointer
+as its `path`, and `{ "limit": 1000 }` as its `params`. Its message is
+`Additional diagnostics were omitted after reaching the limit.` The marker
 does not report an exact omitted count. A diagnostic's `related` locations
 remain attached to their owning top-level diagnostic and do not consume
 additional slots.
