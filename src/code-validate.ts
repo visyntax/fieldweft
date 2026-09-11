@@ -620,27 +620,28 @@ function validateAnnotations(
     )
     return
   }
-  let entryIndex = 0
-  for (const [key, descriptor] of ownEnumerableDescriptors(
+  // Preserve object-limit precedence with only a bounded prefix of descriptors.
+  const metaEntries: Array<[string, PropertyDescriptor]> = []
+  for (const entry of ownEnumerableDescriptors(
     value.meta,
     metaPath,
   )) {
+    metaEntries.push(entry)
+    if (metaEntries.length > FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1) break
+  }
+  if (metaEntries.length > FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1) {
+    addError(
+      state,
+      'limit.meta-per-object',
+      childPath(metaPath, metaEntries[FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1][0]),
+      `An object must not contain more than ${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1} metadata entries.`,
+      { limit: FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 },
+    )
+  }
+  const count = Math.min(metaEntries.length, FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1)
+  for (let index = 0; index < count; index++) {
+    const [key, descriptor] = metaEntries[index]
     const keyPath = childPath(metaPath, key)
-    if (entryIndex >= FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1) {
-      addError(
-        state,
-        'limit.meta-per-object',
-        keyPath,
-        `An object must not contain more than ${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1} metadata entries.`,
-        { limit: FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 },
-      )
-      break
-    }
-    entryIndex++
-    if (!Object.hasOwn(descriptor, 'value')) {
-      throw new UnstableStructuredInputError(keyPath)
-    }
-    const metaValue = descriptor.value
     if (state.metaEntryCount >= FIELD_WEFT_MAX_TOTAL_META_ENTRIES_V1) {
       if (!state.metaLimitReported) {
         state.metaLimitReported = true
@@ -685,6 +686,10 @@ function validateAnnotations(
       consumeAnnotationCodePoints(key, keyPath, state)
     }
 
+    if (!Object.hasOwn(descriptor, 'value')) {
+      throw new UnstableStructuredInputError(keyPath)
+    }
+    const metaValue = descriptor.value
     if (typeof metaValue === 'string') {
       if (
         checkStringLimit(

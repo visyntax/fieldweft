@@ -1851,6 +1851,42 @@ let annotatedCanonical
   )
 }
 
+// Metadata reports the object limit before entry errors and bounds enumeration.
+{
+  const doc = makeValidDoc()
+  const meta = { invalid: {} }
+  for (let index = 0; index < FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1; index++) {
+    meta[`key_${index}`] = index
+  }
+  let descriptorReads = 0
+  let lateReads = 0
+  Object.defineProperty(meta, 'late', {
+    enumerable: true,
+    get() {
+      lateReads++
+      throw new Error('metadata beyond the object limit must not be consumed')
+    },
+  })
+  doc.entities[0].meta = new Proxy(meta, {
+    getOwnPropertyDescriptor(target, key) {
+      descriptorReads++
+      assert.notEqual(key, 'late')
+      return Reflect.getOwnPropertyDescriptor(target, key)
+    },
+  })
+  const result = validateFieldWeftDocV1(doc)
+  assert.equal(result.ok, false)
+  assert.deepEqual(result.errors.map(({ code, path }) => ({ code, path })), [
+    {
+      code: 'limit.meta-per-object',
+      path: `/entities/0/meta/key_${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 - 1}`,
+    },
+    { code: 'meta.value-type', path: '/entities/0/meta/invalid' },
+  ])
+  assert.equal(descriptorReads, FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 + 1)
+  assert.equal(lateReads, 0)
+}
+
 // object별 한도 아래의 annotation도 문서 전체 tag/meta 예산을 넘으면 조기에 거부한다.
 {
   const budgetDoc = (kind) => {
@@ -1909,6 +1945,65 @@ let annotatedCanonical
     ).path,
     /\/entities\/0\/fields\/\d+\/meta\/key_\d+$/,
   )
+
+  // The object limit still precedes the aggregate limit after its budget is spent.
+  const oversizedMeta = Object.fromEntries(
+    Array.from(
+      { length: FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 + 1 },
+      (_, index) => [`key_${index}`, index],
+    ),
+  )
+  const oversizedDoc = budgetDoc('meta')
+  const oversizedFields = oversizedDoc.entities[0].fields
+  const firstExcessIndex = oversizedFields.length - 1
+  oversizedFields[firstExcessIndex].meta = oversizedMeta
+  oversizedFields.push({
+    id: 'later_meta',
+    name: 'later_meta',
+    type: 'string',
+    meta: { ...oversizedMeta },
+  })
+  const oversizedResult = validateFieldWeftDocV1(oversizedDoc)
+  assert.equal(oversizedResult.ok, false)
+  assert.deepEqual(
+    oversizedResult.errors.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: 'limit.meta-per-object',
+        path: `/entities/0/fields/${firstExcessIndex}/meta/key_${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1}`,
+      },
+      {
+        code: 'limit.meta-entries',
+        path: `/entities/0/fields/${firstExcessIndex}/meta/key_0`,
+      },
+      {
+        code: 'limit.meta-per-object',
+        path: `/entities/0/fields/${firstExcessIndex + 1}/meta/key_${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1}`,
+      },
+    ],
+  )
+
+  // Skipped metadata values cannot replace the aggregate diagnostic with instability.
+  const accessorDoc = budgetDoc('meta')
+  const accessorFields = accessorDoc.entities[0].fields
+  const accessorIndex = accessorFields.length - 1
+  let accessorReads = 0
+  Object.defineProperty(accessorFields[accessorIndex].meta, 'key_0', {
+    enumerable: true,
+    get() {
+      accessorReads++
+      throw new Error('metadata beyond the total limit must not be consumed')
+    },
+  })
+  const accessorResult = validateFieldWeftDocV1(accessorDoc)
+  assert.equal(accessorResult.ok, false)
+  assert.deepEqual(accessorResult.errors.map(({ code, path }) => ({ code, path })), [
+    {
+      code: 'limit.meta-entries',
+      path: `/entities/0/fields/${accessorIndex}/meta/key_0`,
+    },
+  ])
+  assert.equal(accessorReads, 0)
 }
 
 // semantic-v1 excludes layout noise; layout-v1 detects it and ignores semantic membership.

@@ -441,7 +441,7 @@ document.
 - top-level diagnostics returned by one validation: at most 1,000
 
 String lengths are counted in Unicode code points, not UTF-16 code units or
-UTF-8 bytes. Input exceeding a limit is rejected rather than truncated. The
+UTF-8 bytes. Input exceeding an input limit is rejected rather than truncated. The
 raw source byte gate runs before JSON parsing; object, string, and aggregate
 limits run after parsing; and the canonical byte gate runs after default
 layout, ordering, and omission rules have been applied. The URL share codec

@@ -361,7 +361,7 @@ vendor payload, 원본 SQL·소스 코드, 실제 데이터 값이나 원본 lin
 - canonical FieldWeft document: compact UTF-8 최대 8 × 1024 × 1024 bytes
 - 한 번의 validation이 반환하는 top-level diagnostic: 최대 1,000개
 
-문자열 길이는 UTF-16 code unit이나 UTF-8 byte가 아니라 Unicode code point 수로 센다. 제한을 넘는
+문자열 길이는 UTF-16 code unit이나 UTF-8 byte가 아니라 Unicode code point 수로 센다. 입력 한도를 넘는
 입력은 잘라서 받아들이지 않는다. raw source byte gate는 JSON parse 전에, object·string·aggregate
 검사는 parse 뒤에, canonical byte gate는 기본 layout과 정렬·생략을 적용한 뒤에 실행한다. URL
 공유 codec은 별도의 더 작은 transport 한도를 추가로 적용한다.
