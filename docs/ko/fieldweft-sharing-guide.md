@@ -73,6 +73,11 @@ FieldWeft 자원 한도뿐 아니라 ID·name·label·annotation·variant 값과
 공유 transport 계약이다. 정확한 문서 한도는
 [명세의 자원 제한](code-spec.md#자원-제한)을 따른다.
 
+validator는 반환하는 원인 목록을 마지막 `diagnostics.truncated` marker로 제한할 수 있지만 입력 자체를
+자르거나 일부 문서를 받아들이지 않는다. 이런 share 결과는 제한된 diagnostics를 유지한 `invalid`다.
+validation이 멈추기 전에 실질적인 `limit.*` diagnostic을 냈다면 기존 `too-large` 결과를 그대로
+적용한다.
+
 ## 수신과 실패 동작
 
 수신자는 token을 제한 안에서 base64url decode·streaming inflate하고, 알려진 pack version을 엄격하게

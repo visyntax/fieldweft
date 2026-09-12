@@ -26,6 +26,7 @@ const {
   FIELD_WEFT_FIELD_TYPES_V1,
   FIELD_WEFT_MAPPING_KINDS_V1,
   FIELD_WEFT_MAX_DESCRIPTION_CHARS_V1,
+  FIELD_WEFT_MAX_DIAGNOSTICS_V1,
   FIELD_WEFT_MAX_FIELD_DEPTH_V1,
   FIELD_WEFT_MAX_FIELDS_V1,
   FIELD_WEFT_MAX_ID_CHARS_V1,
@@ -636,6 +637,171 @@ function addValidNodeRelation(doc, label) {
   )
   errorWithCode(validateFieldWeftDocV1(invalidContainer), 'type.array')
   assert.equal(invalidOwnKeys, 0)
+}
+
+// One validation operation returns a bounded deterministic diagnostic prefix.
+{
+  const emptyDoc = () => ({
+    format: 'fieldweft',
+    version: 1,
+    entities: [],
+    processes: [],
+    boundaries: [],
+    nodeRelations: [],
+    mappings: [],
+  })
+  const truncationMarker = {
+    code: 'diagnostics.truncated',
+    path: '',
+    severity: 'error',
+    message: 'Additional diagnostics were omitted after reaching the limit.',
+    params: { limit: FIELD_WEFT_MAX_DIAGNOSTICS_V1 },
+  }
+
+  const small = emptyDoc()
+  small.extra = true
+  const smallResult = validateFieldWeftDocV1(small)
+  assert.equal(smallResult.ok, false)
+  assert.deepEqual(
+    smallResult.errors.map(({ code, path }) => ({ code, path })),
+    [{ code: 'property.unknown', path: '/extra' }],
+  )
+
+  const unknownPropertyDoc = (count) => {
+    const doc = emptyDoc()
+    for (let index = 0; index < count; index++) doc[`x${index}`] = true
+    return doc
+  }
+
+  const belowBudgetResult = validateFieldWeftDocV1(
+    unknownPropertyDoc(FIELD_WEFT_MAX_DIAGNOSTICS_V1 - 1),
+  )
+  assert.equal(belowBudgetResult.ok, false)
+  assert.equal(
+    belowBudgetResult.errors.length,
+    FIELD_WEFT_MAX_DIAGNOSTICS_V1 - 1,
+  )
+  assert.equal(
+    belowBudgetResult.errors.at(-1).path,
+    `/x${FIELD_WEFT_MAX_DIAGNOSTICS_V1 - 2}`,
+  )
+  assert.equal(
+    belowBudgetResult.errors.some(
+      ({ code }) => code === 'diagnostics.truncated',
+    ),
+    false,
+  )
+
+  const propertyHeavy = unknownPropertyDoc(FIELD_WEFT_MAX_DIAGNOSTICS_V1)
+  const propertyResult = validateFieldWeftDocV1(propertyHeavy)
+  assert.equal(propertyResult.ok, false)
+  assert.equal(propertyResult.errors.length, FIELD_WEFT_MAX_DIAGNOSTICS_V1)
+  assert.equal(propertyResult.errors[0].path, '/x0')
+  assert.equal(
+    propertyResult.errors.at(-2).path,
+    `/x${FIELD_WEFT_MAX_DIAGNOSTICS_V1 - 2}`,
+  )
+  assert.deepEqual(propertyResult.errors.at(-1), truncationMarker)
+
+  const readResult = readFieldWeftDoc(propertyHeavy)
+  assert.equal(readResult.kind, 'invalid')
+  assert.deepEqual(readResult.errors, propertyResult.errors)
+  const canonicalResult = readCanonicalFieldWeftDoc(propertyHeavy)
+  assert.equal(canonicalResult.ok, false)
+  assert.deepEqual(canonicalResult.errors, propertyResult.errors)
+
+  let lateDescriptorReads = 0
+  let ownKeyReads = 0
+  const lateUnstableTarget = emptyDoc()
+  for (let index = 0; index < FIELD_WEFT_MAX_DIAGNOSTICS_V1; index++) {
+    lateUnstableTarget[`x${index}`] = true
+  }
+  Object.defineProperty(lateUnstableTarget, 'late', {
+    enumerable: true,
+    get() {
+      throw new Error('late accessors must remain unobserved')
+    },
+  })
+  const lateUnstable = new Proxy(lateUnstableTarget, {
+    ownKeys(target) {
+      ownKeyReads++
+      return Reflect.ownKeys(target)
+    },
+    getOwnPropertyDescriptor(target, key) {
+      lateDescriptorReads++
+      return Reflect.getOwnPropertyDescriptor(target, key)
+    },
+  })
+  const lateResult = validateFieldWeftDocV1(lateUnstable)
+  assert.equal(lateResult.ok, false)
+  assert.deepEqual(lateResult.errors.at(-1), truncationMarker)
+  assert.equal(ownKeyReads, 1)
+  assert.equal(
+    lateDescriptorReads,
+    7 + FIELD_WEFT_MAX_DIAGNOSTICS_V1,
+  )
+
+  const earlyUnstable = emptyDoc()
+  for (let index = 0; index < 10; index++) earlyUnstable[`x${index}`] = true
+  Object.defineProperty(earlyUnstable, 'unstable', {
+    enumerable: true,
+    get() {
+      throw new Error('unstable accessors must not be invoked')
+    },
+  })
+  for (let index = 10; index < FIELD_WEFT_MAX_DIAGNOSTICS_V1; index++) {
+    earlyUnstable[`x${index}`] = true
+  }
+  const earlyResult = validateFieldWeftDocV1(earlyUnstable)
+  assert.equal(earlyResult.ok, false)
+  assert.deepEqual(earlyResult.errors, [
+    {
+      code: 'input.unstable',
+      path: '/unstable',
+      severity: 'error',
+      message:
+        'Structured input must use stable own data properties and dense arrays.',
+    },
+  ])
+
+  let deferredOwnKeys = 0
+  const deferredWhen = new Proxy(
+    { missing_discriminator: ['value'] },
+    {
+      ownKeys(target) {
+        deferredOwnKeys++
+        if (deferredOwnKeys > 1) {
+          throw new Error('deferred reference checks must not run')
+        }
+        return Reflect.ownKeys(target)
+      },
+    },
+  )
+  const invalidFields = Array.from(
+    { length: FIELD_WEFT_MAX_FIELDS_V1 - 1 },
+    () => ({}),
+  )
+  invalidFields.unshift({
+    id: 'conditional',
+    name: 'conditional',
+    type: 'string',
+    when: deferredWhen,
+  })
+  const fieldHeavy = emptyDoc()
+  fieldHeavy.entities = [
+    { id: 'entity', name: 'Entity', kind: 'db', fields: invalidFields },
+  ]
+  const fieldResult = validateFieldWeftDocV1(fieldHeavy)
+  assert.equal(fieldResult.ok, false)
+  assert.equal(fieldResult.errors.length, FIELD_WEFT_MAX_DIAGNOSTICS_V1)
+  assert.deepEqual(fieldResult.errors.at(-1), truncationMarker)
+  assert.equal(deferredOwnKeys, 1)
+  invalidFields[0].when = { missing_discriminator: ['value'] }
+  const repeatedFieldResult = validateFieldWeftDocV1(fieldHeavy)
+  assert.deepEqual(
+    validateFieldWeftDocV1(fieldHeavy).errors,
+    repeatedFieldResult.errors,
+  )
 }
 
 // Array methods and iteration hooks are outside the JSON array representation.
@@ -1685,6 +1851,42 @@ let annotatedCanonical
   )
 }
 
+// Metadata reports the object limit before entry errors and bounds enumeration.
+{
+  const doc = makeValidDoc()
+  const meta = { invalid: {} }
+  for (let index = 0; index < FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1; index++) {
+    meta[`key_${index}`] = index
+  }
+  let descriptorReads = 0
+  let lateReads = 0
+  Object.defineProperty(meta, 'late', {
+    enumerable: true,
+    get() {
+      lateReads++
+      throw new Error('metadata beyond the object limit must not be consumed')
+    },
+  })
+  doc.entities[0].meta = new Proxy(meta, {
+    getOwnPropertyDescriptor(target, key) {
+      descriptorReads++
+      assert.notEqual(key, 'late')
+      return Reflect.getOwnPropertyDescriptor(target, key)
+    },
+  })
+  const result = validateFieldWeftDocV1(doc)
+  assert.equal(result.ok, false)
+  assert.deepEqual(result.errors.map(({ code, path }) => ({ code, path })), [
+    {
+      code: 'limit.meta-per-object',
+      path: `/entities/0/meta/key_${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 - 1}`,
+    },
+    { code: 'meta.value-type', path: '/entities/0/meta/invalid' },
+  ])
+  assert.equal(descriptorReads, FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 + 1)
+  assert.equal(lateReads, 0)
+}
+
 // object별 한도 아래의 annotation도 문서 전체 tag/meta 예산을 넘으면 조기에 거부한다.
 {
   const budgetDoc = (kind) => {
@@ -1743,6 +1945,65 @@ let annotatedCanonical
     ).path,
     /\/entities\/0\/fields\/\d+\/meta\/key_\d+$/,
   )
+
+  // The object limit still precedes the aggregate limit after its budget is spent.
+  const oversizedMeta = Object.fromEntries(
+    Array.from(
+      { length: FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1 + 1 },
+      (_, index) => [`key_${index}`, index],
+    ),
+  )
+  const oversizedDoc = budgetDoc('meta')
+  const oversizedFields = oversizedDoc.entities[0].fields
+  const firstExcessIndex = oversizedFields.length - 1
+  oversizedFields[firstExcessIndex].meta = oversizedMeta
+  oversizedFields.push({
+    id: 'later_meta',
+    name: 'later_meta',
+    type: 'string',
+    meta: { ...oversizedMeta },
+  })
+  const oversizedResult = validateFieldWeftDocV1(oversizedDoc)
+  assert.equal(oversizedResult.ok, false)
+  assert.deepEqual(
+    oversizedResult.errors.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: 'limit.meta-per-object',
+        path: `/entities/0/fields/${firstExcessIndex}/meta/key_${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1}`,
+      },
+      {
+        code: 'limit.meta-entries',
+        path: `/entities/0/fields/${firstExcessIndex}/meta/key_0`,
+      },
+      {
+        code: 'limit.meta-per-object',
+        path: `/entities/0/fields/${firstExcessIndex + 1}/meta/key_${FIELD_WEFT_MAX_META_ENTRIES_PER_OBJECT_V1}`,
+      },
+    ],
+  )
+
+  // Skipped metadata values cannot replace the aggregate diagnostic with instability.
+  const accessorDoc = budgetDoc('meta')
+  const accessorFields = accessorDoc.entities[0].fields
+  const accessorIndex = accessorFields.length - 1
+  let accessorReads = 0
+  Object.defineProperty(accessorFields[accessorIndex].meta, 'key_0', {
+    enumerable: true,
+    get() {
+      accessorReads++
+      throw new Error('metadata beyond the total limit must not be consumed')
+    },
+  })
+  const accessorResult = validateFieldWeftDocV1(accessorDoc)
+  assert.equal(accessorResult.ok, false)
+  assert.deepEqual(accessorResult.errors.map(({ code, path }) => ({ code, path })), [
+    {
+      code: 'limit.meta-entries',
+      path: `/entities/0/fields/${accessorIndex}/meta/key_0`,
+    },
+  ])
+  assert.equal(accessorReads, 0)
 }
 
 // semantic-v1 excludes layout noise; layout-v1 detects it and ignores semantic membership.

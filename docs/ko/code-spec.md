@@ -52,8 +52,12 @@ descriptor는 검사하지만 unknown property, 잘못된 container type, 자원
 요소의 값 아래는 재귀적으로 검사하지 않는다. 이런 입력은 버려지는 하위 트리를 순회하지 않고 해당
 property, type, limit diagnostic을 받는다.
 
-구조화 입력 거부는 `input.unstable` diagnostic 하나만 보고하고 다른 diagnostic은 보고하지 않는다.
-불안정한 위치가 둘 이상이면 어느 위치가 diagnostic path를 결정하는지는 규정하지 않는다.
+diagnostic 예산이 소진된 뒤에도 schema 경로나 collection entry를 더 소비하지 않는다. 따라서 건너뛴
+나머지 경로의 accessor, sparse element, Proxy failure는 검사하지 않는다.
+
+종료 전에 소비한 경로에서 불안정한 값을 만나면 누적 error를 `input.unstable` diagnostic 하나로
+교체하고 다른 diagnostic은 보고하지 않는다. 불안정한 위치가 둘 이상이면 어느 위치가 diagnostic
+path를 결정하는지는 규정하지 않는다.
 
 배열은 검증이 읽는 범위 안에서 `length`와 own indexed data property로 읽는다. override된 배열
 method와 iteration hook을 포함한 own non-index string property와 symbol property는 JSON 배열 표현
@@ -355,11 +359,24 @@ vendor payload, 원본 SQL·소스 코드, 실제 데이터 값이나 원본 lin
 - boundary width/height: `1..10,000,000` 범위의 safe integer
 - raw JSON source: UTF-8 최대 16 × 1024 × 1024 bytes
 - canonical FieldWeft document: compact UTF-8 최대 8 × 1024 × 1024 bytes
+- 한 번의 validation이 반환하는 top-level diagnostic: 최대 1,000개
 
-문자열 길이는 UTF-16 code unit이나 UTF-8 byte가 아니라 Unicode code point 수로 센다. 제한을 넘는
+문자열 길이는 UTF-16 code unit이나 UTF-8 byte가 아니라 Unicode code point 수로 센다. 입력 한도를 넘는
 입력은 잘라서 받아들이지 않는다. raw source byte gate는 JSON parse 전에, object·string·aggregate
 검사는 parse 뒤에, canonical byte gate는 기본 layout과 정렬·생략을 적용한 뒤에 실행한다. URL
 공유 codec은 별도의 더 작은 transport 한도를 추가로 적용한다.
+
+`FIELD_WEFT_MAX_DIAGNOSTICS_V1`은 1,000이다. validation이 1,000번째 일반 diagnostic을 내려고 하면
+마지막 slot에는 그 diagnostic 대신 `diagnostics.truncated` marker를 낸다. 일반 diagnostic이 999개
+이하면 모두 반환하고, 원인이 1,000개 이상이면 일반 diagnostic 999개 뒤에 marker를 붙여 반환한다.
+marker는 `error` severity, 빈 JSON Pointer `path`, `{ "limit": 1000 }` params를 가진다. 메시지는
+`Additional diagnostics were omitted after reaching the limit.`이다. marker는 생략된 수를 정확히
+보고하지 않는다. diagnostic의 `related` location은 소유 diagnostic에 붙어 있으며 별도 slot을
+소비하지 않는다.
+
+이 marker는 전체 입력이 여전히 거부되고 원인 목록만 잘렸다는 뜻이며 입력을 고치거나 받아들이는
+규칙이 아니다. marker를 낸 뒤에는 invalid 결과를 바꿀 수 없는 나머지 순회와 deferred check를
+중단한다.
 
 ## v1 지원 범위와 v2 boundary 확장 경로
 

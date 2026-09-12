@@ -13,10 +13,12 @@ const {
   FIELD_WEFT_MAPPING_KINDS_V1,
   FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1,
   FIELD_WEFT_MAX_DESCRIPTION_CHARS_V1,
+  FIELD_WEFT_MAX_DIAGNOSTICS_V1,
   FIELD_WEFT_MAX_FIELD_DEPTH_V1,
   FIELD_WEFT_MAX_LABEL_CHARS_V1,
   FIELD_WEFT_MAX_NODES_V1,
   FIELD_WEFT_MAX_RELATIONS_V1,
+  FIELD_WEFT_MAX_TAGS_PER_OBJECT_V1,
   FIELD_WEFT_MAX_VARIANT_VALUES_V1,
 } = await import('../dist/index.js')
 const { readCanonicalFieldWeftDoc } = await import('../dist/index.js')
@@ -254,6 +256,55 @@ function tokenFromJson(value) {
   assert.deepEqual(await encodeFieldWeftShare(oversizedAnnotations), {
     kind: 'too-large',
     limit: 'FIELD_WEFT_MAX_TOTAL_ANNOTATION_CODEPOINTS_V1',
+  })
+
+  const manyUnknownProperties = structuredClone(golden.document)
+  for (let index = 0; index < FIELD_WEFT_MAX_DIAGNOSTICS_V1 + 50; index++) {
+    manyUnknownProperties[`x${index}`] = true
+  }
+  const truncated = await encodeFieldWeftShare(manyUnknownProperties)
+  assert.equal(truncated.kind, 'invalid')
+  assert.equal(truncated.diagnostics.length, FIELD_WEFT_MAX_DIAGNOSTICS_V1)
+  assert.deepEqual(truncated.diagnostics.at(-1), {
+    code: 'diagnostics.truncated',
+    path: '',
+    severity: 'error',
+    message: 'Additional diagnostics were omitted after reaching the limit.',
+    params: { limit: FIELD_WEFT_MAX_DIAGNOSTICS_V1 },
+  })
+
+  const limitBeforeTruncation = {
+    format: 'fieldweft',
+    version: 1,
+    entities: [
+      {
+        id: 'limited',
+        name: 'Limited',
+        kind: 'db',
+        fields: [],
+        tags: Array.from(
+          { length: FIELD_WEFT_MAX_TAGS_PER_OBJECT_V1 + 1 },
+          (_, index) => `tag_${index}`,
+        ),
+      },
+      { id: 'invalid', name: 'Invalid', kind: 'db', fields: [] },
+    ],
+    processes: [],
+    boundaries: [],
+    nodeRelations: [],
+    mappings: [],
+  }
+  for (let index = 0; index < FIELD_WEFT_MAX_DIAGNOSTICS_V1; index++) {
+    limitBeforeTruncation.entities[1][`x${index}`] = true
+  }
+  const limited = readCanonicalFieldWeftDoc(limitBeforeTruncation)
+  assert.equal(limited.ok, false)
+  assert.equal(limited.errors.length, FIELD_WEFT_MAX_DIAGNOSTICS_V1)
+  assert.equal(limited.errors[0].code, 'limit.tags-per-object')
+  assert.deepEqual(limited.errors.at(-1), truncated.diagnostics.at(-1))
+  assert.deepEqual(await encodeFieldWeftShare(limitBeforeTruncation), {
+    kind: 'too-large',
+    limit: 'FIELD_WEFT_MAX_TAGS_PER_OBJECT_V1',
   })
 }
 
